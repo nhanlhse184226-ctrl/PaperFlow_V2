@@ -16,7 +16,12 @@ class SupabaseStorage:
         self.service_url = url.rstrip("/") + "/storage/v1"
         self.bucket = bucket
         self.base_url = self.service_url + "/object/" + quote(bucket, safe="")
-        self.headers = {"apikey": service_role_key, "Authorization": f"Bearer {service_role_key}"}
+        # Supabase's current sb_secret keys are opaque tokens and must only be
+        # sent through apikey. Legacy service_role keys are JWTs and still need
+        # the Authorization header for Storage's service-role access.
+        self.headers = {"apikey": service_role_key}
+        if service_role_key.startswith("eyJ"):
+            self.headers["Authorization"] = f"Bearer {service_role_key}"
 
     @staticmethod
     def _name(source_id: str):
