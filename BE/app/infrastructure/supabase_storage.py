@@ -35,26 +35,17 @@ class SupabaseStorage:
             return "unknown"
 
     def ensure_bucket(self):
-        existing = httpx.get(
-            self.service_url + "/bucket/" + quote(self.bucket, safe=""),
-            headers=self.headers,
-            timeout=20,
-        )
-        if existing.status_code == 200:
-            return
-        if existing.status_code != 404:
-            raise RuntimeError(
-                "Supabase Storage bucket availability could not be checked "
-                f"({existing.status_code}: {self._error_code(existing)})."
-            )
         response = httpx.post(
             self.service_url + "/bucket",
             headers={**self.headers, "Content-Type": "application/json"},
-            json={"id": self.bucket, "name": self.bucket, "public": False},
+            json={"name": self.bucket, "public": False},
             timeout=20,
         )
-        # 409 means the private bucket already exists.
-        if response.status_code not in (200, 201, 409):
+        # The API reports an existing bucket as 409 in newer versions and as a
+        # 400 BucketAlreadyExists response in older versions.
+        if response.status_code not in (200, 201, 409) and not (
+            response.status_code == 400 and self._error_code(response) == "BucketAlreadyExists"
+        ):
             raise RuntimeError(
                 "Supabase Storage bucket could not be initialized "
                 f"({response.status_code}: {self._error_code(response)})."
