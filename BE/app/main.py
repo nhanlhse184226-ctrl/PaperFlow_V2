@@ -6,6 +6,7 @@ from fastapi import FastAPI, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 from pydantic_settings import BaseSettings, SettingsConfigDict
+from starlette.middleware.cors import CORSMiddleware
 from starlette.middleware.trustedhost import TrustedHostMiddleware
 
 from app.api import create_router
@@ -14,7 +15,9 @@ from app.application.services import AuthService, WorkspaceService
 from app.infrastructure.files import LocalStorage, PypdfExtractor
 from app.infrastructure.gemini import GeminiAiProvider
 from app.infrastructure.ollama import OllamaAiProvider
+from app.infrastructure.postgres_repository import PostgresRepository
 from app.infrastructure.repository import SqliteRepository
+from app.infrastructure.supabase_storage import SupabaseStorage
 
 
 class Settings(BaseSettings):
@@ -27,8 +30,13 @@ class Settings(BaseSettings):
     ollama_url: str = "http://127.0.0.1:11434"
     environment: Literal["development", "production"] = "development"
     secure_cookies: bool = False
+    cookie_samesite: Literal["strict", "lax", "none"] = "strict"
     allowed_origins: str = "http://localhost:5173,http://127.0.0.1:5173,http://localhost:8080"
     allowed_hosts: str = "localhost,127.0.0.1,testserver"
+    database_url: str = ""
+    supabase_url: str = ""
+    supabase_service_role_key: str = ""
+    supabase_bucket: str = "paperflow"
 
 
 def create_app(settings=None, ai=None, pdf=None):
@@ -39,17 +47,38 @@ def create_app(settings=None, ai=None, pdf=None):
     settings = settings or Settings()
     if settings.environment == "production" and not settings.secure_cookies:
         raise RuntimeError("SECURE_COOKIES must be true in production; terminate HTTPS at the edge.")
-    repo = SqliteRepository(settings.data_dir / "paperflow.db")
+    if settings.cookie_samesite == "none" and not settings.secure_cookies:
+        raise RuntimeError("COOKIE_SAMESITE=none requires SECURE_COOKIES=true.")
+    if settings.environment == "production" and not settings.database_url:
+        raise RuntimeError("DATABASE_URL is required in production.")
+    if settings.environment == "production" and not (
+        settings.supabase_url and settings.supabase_service_role_key
+    ):
+        raise RuntimeError("Supabase Storage is required in production.")
+    repo = (
+        PostgresRepository(settings.database_url)
+        if settings.database_url
+        else SqliteRepository(settings.data_dir / "paperflow.db")
+    )
     provider = ai or (
         OllamaAiProvider(settings.ollama_model, settings.ollama_url)
         if settings.ai_provider == "ollama"
         else GeminiAiProvider(settings.gemini_api_key, settings.gemini_model)
     )
+    storage = (
+        SupabaseStorage(
+            settings.supabase_url, settings.supabase_service_role_key, settings.supabase_bucket
+        )
+        if settings.supabase_url and settings.supabase_service_role_key
+        else LocalStorage(settings.data_dir / "uploads")
+    )
+    if isinstance(storage, SupabaseStorage):
+        storage.ensure_bucket()
     service = WorkspaceService(
         repo,
         provider,
         pdf or PypdfExtractor(),
-        LocalStorage(settings.data_dir / "uploads"),
+        storage,
     )
     app = FastAPI(
         title="PaperFlow API",
@@ -62,12 +91,19 @@ def create_app(settings=None, ai=None, pdf=None):
     app.state.repo = repo
     app.add_middleware(TrustedHostMiddleware, allowed_hosts=settings.allowed_hosts.split(","))
     origins = set(settings.allowed_origins.split(","))
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=list(origins),
+        allow_credentials=True,
+        allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+        allow_headers=["Content-Type"],
+    )
 
     @app.middleware("http")
     async def boundaries(request: Request, call_next):
         if request.method not in ("GET", "HEAD", "OPTIONS"):
             origin = request.headers.get("origin")
-            if (origin and origin not in origins) or request.headers.get("sec-fetch-site") == "cross-site":
+            if origin and origin not in origins:
                 return JSONResponse({"message": "Request origin is not allowed."}, status_code=403)
             try:
                 if int(request.headers.get("content-length", "0")) > 21 * 1024 * 1024:

@@ -78,7 +78,7 @@ def create_router(service, auth, settings):
             max_age=604800,
             httponly=True,
             secure=settings.secure_cookies,
-            samesite="strict",
+            samesite=settings.cookie_samesite,
             path="/",
         )
         return current
@@ -98,7 +98,12 @@ def create_router(service, auth, settings):
     @router.post("/auth/logout")
     def logout(request: Request, response: Response):
         auth.logout(request.cookies.get("paperflow_session", ""))
-        response.delete_cookie("paperflow_session", path="/")
+        response.delete_cookie(
+            "paperflow_session",
+            path="/",
+            secure=settings.secure_cookies,
+            samesite=settings.cookie_samesite,
+        )
         return {"ok": True}
 
     @router.get("/projects")

@@ -1,0 +1,18 @@
+services:
+  - type: web
+    name: paperflow-api
+    runtime: docker
+    rootDir: BE
+    healthCheckPath: /api/health
+    autoDeploy: true
+    envVars:
+      - key: ENVIRONMENT
+        value: production
+      - key: SECURE_COOKIES
+        value: true
+      - key: COOKIE_SAMESITE
+        value: none
+      - key: SUPABASE_BUCKET
+        value: paperflow
+      # Set the remaining values as secrets in the Render dashboard. They are
+      # intentionally not included in source control.

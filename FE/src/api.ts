@@ -6,15 +6,23 @@ export class ApiError extends Error {
     super(message);
   }
 }
+
+const configuredApiUrl = import.meta.env.VITE_API_URL?.replace(/\/$/, "");
+
+/** Builds an API URL for local proxying or a separately hosted API. */
+export function apiUrl(path: string): string {
+  return (configuredApiUrl || "") + "/api" + path;
+}
+
 export async function api<T>(
   path: string,
   method = "GET",
   data?: unknown,
 ): Promise<T> {
   const form = data instanceof FormData;
-  const response = await fetch("/api" + path, {
+  const response = await fetch(apiUrl(path), {
     method,
-    credentials: "same-origin",
+    credentials: configuredApiUrl ? "include" : "same-origin",
     headers: data && !form ? { "Content-Type": "application/json" } : undefined,
     body: data ? (form ? data : JSON.stringify(data)) : undefined,
   });

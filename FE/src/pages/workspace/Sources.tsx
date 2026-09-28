@@ -8,7 +8,7 @@ import {
   Upload,
   X,
 } from "lucide-react";
-import { api } from "../../api";
+import { api, apiUrl } from "../../api";
 import { Badge, Empty, Notice, TextList, Modal } from "../../ui";
 import type { Source, WorkspaceProps } from "../../types";
 export default function Sources({
@@ -167,7 +167,7 @@ export default function Sources({
             <Badge>{detail.page_count} extracted pages</Badge>
             <a
               className="button"
-              href={"/api" + base + "/sources/" + detail.id + "/file"}
+              href={apiUrl(base + "/sources/" + detail.id + "/file")}
               target="_blank"
               rel="noreferrer"
             >

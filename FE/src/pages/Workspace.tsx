@@ -7,7 +7,7 @@ import {
   useParams,
 } from "react-router-dom";
 import { ArrowRight, Check, ChevronRight, LoaderCircle } from "lucide-react";
-import { api } from "../api";
+import { api, apiUrl } from "../api";
 import { Badge, Notice, Modal, message } from "../ui";
 import type { Evidence, Project } from "../types";
 import Overview from "./workspace/Overview";
@@ -180,14 +180,7 @@ function ProjectWorkspace() {
           </p>
           <a
             className="button primary"
-            href={
-              "/api" +
-              base +
-              "/sources/" +
-              selected.source_id +
-              "/file#page=" +
-              selected.page
-            }
+            href={apiUrl(base + "/sources/" + selected.source_id + "/file#page=" + selected.page)}
             target="_blank"
             rel="noreferrer"
           >

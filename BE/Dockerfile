@@ -7,4 +7,4 @@ RUN mkdir -p /data/uploads && chown -R paperflow:paperflow /data /app
 USER paperflow
 ENV DATA_DIR=/data PYTHONUNBUFFERED=1
 EXPOSE 8000
-CMD ["uvicorn","app.main:app","--host","0.0.0.0","--port","8000","--workers","1","--no-proxy-headers"]
+CMD ["sh","-c","uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-8000} --workers 1 --proxy-headers --forwarded-allow-ips='*'"]

@@ -1,5 +1,39 @@
 # PaperFlow deployment
 
+## Hosted free deployment: Supabase + Render + Vercel
+
+The local Docker deployment remains available and uses its named volume. For a
+hosted deployment without a paid persistent disk, use **Supabase Free** for
+PostgreSQL and private PDF storage, **Render Free** for the FastAPI service,
+and **Vercel Free** for the React site. The backend creates the private
+`paperflow` storage bucket automatically on its first successful connection.
+
+1. Create a Supabase project. In **Project Settings → Database → Connect**, copy
+   a pooled PostgreSQL connection string into Render as `DATABASE_URL`; include
+   `sslmode=require`. In
+   **Project Settings → API**, copy the project URL to `SUPABASE_URL` and the
+   `service_role` key to `SUPABASE_SERVICE_ROLE_KEY`. Do not expose that key in
+   Vercel or browser code.
+2. In Render, create a Blueprint from this repository; it reads
+   [`render.yaml`](render.yaml). Add the Supabase values and the existing
+   `GEMINI_API_KEY` in Render's secret environment settings. Set
+   `ALLOWED_HOSTS` to the generated Render hostname and temporarily set
+   `ALLOWED_ORIGINS` to the future Vercel origin after it is known.
+3. Deploy the frontend root directory `FE` on Vercel. Set `VITE_API_URL` to the
+   HTTPS origin of the Render API, without `/api`. Then add that exact Vercel
+   origin to Render's `ALLOWED_ORIGINS`; no wildcard origins are accepted for
+   authenticated requests.
+4. In Vercel set the build command to `npm run build` and output directory to
+   `dist`. Add the SPA rewrite below in `FE/vercel.json` before deployment.
+
+The first cold request to a Render Free service can be slow. Supabase Free has
+finite capacity, so export production data regularly. Render Free does not
+provide a persistent disk; do not configure `DATA_DIR` as hosted primary
+storage. See the current [Supabase plan limits](https://supabase.com/docs/guides/platform/billing-on-supabase)
+and [Render free limitations](https://render.com/docs/free).
+
+## Local Docker deployment
+
 ## Prerequisites
 
 Docker Engine/Desktop with Compose, a persistent storage volume, outbound HTTPS access to the Gemini API, and an API key authorized for a JSON-schema-capable Gemini model. For internet access, configure a domain and an HTTPS reverse proxy on the host. The frontend listens on loopback port 8080; the backend remains on the private Compose network.
