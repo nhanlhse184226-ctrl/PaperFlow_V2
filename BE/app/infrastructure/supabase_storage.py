@@ -27,6 +27,13 @@ class SupabaseStorage:
     def _name(source_id: str):
         return quote(source_id + ".pdf", safe="")
 
+    @staticmethod
+    def _error_code(response: httpx.Response):
+        try:
+            return str(response.json().get("code", "unknown"))
+        except (ValueError, AttributeError):
+            return "unknown"
+
     def ensure_bucket(self):
         existing = httpx.get(
             self.service_url + "/bucket/" + quote(self.bucket, safe=""),
@@ -37,7 +44,8 @@ class SupabaseStorage:
             return
         if existing.status_code != 404:
             raise RuntimeError(
-                f"Supabase Storage bucket availability could not be checked ({existing.status_code})."
+                "Supabase Storage bucket availability could not be checked "
+                f"({existing.status_code}: {self._error_code(existing)})."
             )
         response = httpx.post(
             self.service_url + "/bucket",
@@ -47,7 +55,10 @@ class SupabaseStorage:
         )
         # 409 means the private bucket already exists.
         if response.status_code not in (200, 201, 409):
-            raise RuntimeError(f"Supabase Storage bucket could not be initialized ({response.status_code}).")
+            raise RuntimeError(
+                "Supabase Storage bucket could not be initialized "
+                f"({response.status_code}: {self._error_code(response)})."
+            )
 
     def put(self, source_id: str, content: bytes):
         response = httpx.put(
