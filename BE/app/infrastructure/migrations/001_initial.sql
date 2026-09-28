@@ -1,0 +1,14 @@
+CREATE TABLE users (id TEXT PRIMARY KEY, email TEXT NOT NULL UNIQUE, password_hash TEXT NOT NULL);
+CREATE TABLE sessions (token_hash TEXT PRIMARY KEY, user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE, expires REAL NOT NULL);
+CREATE INDEX session_user ON sessions(user_id);
+CREATE TABLE projects (id TEXT PRIMARY KEY, owner_id TEXT NOT NULL REFERENCES users(id), version INTEGER NOT NULL, data TEXT NOT NULL);
+CREATE INDEX project_owner ON projects(owner_id);
+CREATE TABLE sources (id TEXT PRIMARY KEY, project_id TEXT NOT NULL REFERENCES projects(id) ON DELETE CASCADE, digest TEXT NOT NULL, data TEXT NOT NULL, UNIQUE(project_id,digest));
+CREATE TABLE pages (source_id TEXT NOT NULL REFERENCES sources(id) ON DELETE CASCADE, number INTEGER NOT NULL CHECK(number>0), text TEXT NOT NULL, PRIMARY KEY(source_id,number));
+CREATE TABLE evidence (id TEXT PRIMARY KEY, source_id TEXT NOT NULL, page INTEGER NOT NULL, data TEXT NOT NULL, FOREIGN KEY(source_id,page) REFERENCES pages(source_id,number) ON DELETE CASCADE);
+CREATE TABLE drafts (id TEXT PRIMARY KEY, project_id TEXT NOT NULL REFERENCES projects(id) ON DELETE CASCADE, data TEXT NOT NULL);
+CREATE TABLE claims (id TEXT PRIMARY KEY, draft_id TEXT NOT NULL REFERENCES drafts(id) ON DELETE CASCADE, data TEXT NOT NULL);
+CREATE TABLE matches (claim_id TEXT NOT NULL REFERENCES claims(id) ON DELETE CASCADE, evidence_id TEXT NOT NULL REFERENCES evidence(id) ON DELETE CASCADE, data TEXT NOT NULL, PRIMARY KEY(claim_id,evidence_id));
+CREATE TABLE comparisons (project_id TEXT NOT NULL REFERENCES projects(id) ON DELETE CASCADE, ordinal INTEGER NOT NULL, data TEXT NOT NULL, PRIMARY KEY(project_id,ordinal));
+CREATE TABLE operations (project_id TEXT PRIMARY KEY REFERENCES projects(id) ON DELETE CASCADE, token TEXT NOT NULL, label TEXT NOT NULL, expires REAL NOT NULL);
+CREATE TABLE notes (id TEXT PRIMARY KEY, owner_id TEXT NOT NULL REFERENCES users(id), topic TEXT NOT NULL, note TEXT NOT NULL, created_at TEXT NOT NULL);

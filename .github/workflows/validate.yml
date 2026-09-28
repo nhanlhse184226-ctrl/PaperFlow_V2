@@ -1,0 +1,27 @@
+name: Validate PaperFlow
+on: [push, pull_request]
+jobs:
+  checks:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: FE/package-lock.json
+      - run: pip install -r requirements.lock.txt
+        working-directory: BE
+      - run: python -m compileall -q app && ruff check app tests && pytest -q
+        working-directory: BE
+      - run: npm ci && npm run typecheck && npm run lint && npm run build
+        working-directory: FE
+      - run: npx playwright install --with-deps chromium
+        working-directory: FE
+      - run: python -m tests.prepare_e2e
+        working-directory: BE
+      - run: npm run test:e2e
+        working-directory: FE
