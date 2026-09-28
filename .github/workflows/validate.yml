@@ -15,7 +15,7 @@ jobs:
           cache-dependency-path: FE/package-lock.json
       - run: pip install -r requirements.lock.txt
         working-directory: BE
-      - run: python -m compileall -q app && ruff check app tests && pytest -q
+      - run: mkdir -p ../artifacts && python -m compileall -q app && ruff check app tests && pytest -q
         working-directory: BE
       - run: npm ci && npm run typecheck && npm run lint && npm run build
         working-directory: FE
