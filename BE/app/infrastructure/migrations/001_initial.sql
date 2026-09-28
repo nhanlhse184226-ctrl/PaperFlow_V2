@@ -1,6 +1,6 @@
 CREATE TABLE users (id TEXT PRIMARY KEY, email TEXT NOT NULL UNIQUE, password_hash TEXT NOT NULL);
 CREATE TABLE sessions (token_hash TEXT PRIMARY KEY, user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE, expires REAL NOT NULL);
-CREATE INDEX session_user ON sessions(user_id);
+CREATE INDEX sessions_user_idx ON sessions(user_id);
 CREATE TABLE projects (id TEXT PRIMARY KEY, owner_id TEXT NOT NULL REFERENCES users(id), version INTEGER NOT NULL, data TEXT NOT NULL);
 CREATE INDEX project_owner ON projects(owner_id);
 CREATE TABLE sources (id TEXT PRIMARY KEY, project_id TEXT NOT NULL REFERENCES projects(id) ON DELETE CASCADE, digest TEXT NOT NULL, data TEXT NOT NULL, UNIQUE(project_id,digest));
