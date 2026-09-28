@@ -16,8 +16,8 @@ from app.infrastructure.files import LocalStorage, PypdfExtractor
 from app.infrastructure.gemini import GeminiAiProvider
 from app.infrastructure.ollama import OllamaAiProvider
 from app.infrastructure.postgres_repository import PostgresRepository
+from app.infrastructure.postgres_storage import PostgresStorage
 from app.infrastructure.repository import SqliteRepository
-from app.infrastructure.supabase_storage import SupabaseStorage
 
 
 class Settings(BaseSettings):
@@ -51,10 +51,6 @@ def create_app(settings=None, ai=None, pdf=None):
         raise RuntimeError("COOKIE_SAMESITE=none requires SECURE_COOKIES=true.")
     if settings.environment == "production" and not settings.database_url:
         raise RuntimeError("DATABASE_URL is required in production.")
-    if settings.environment == "production" and not (
-        settings.supabase_url and settings.supabase_service_role_key
-    ):
-        raise RuntimeError("Supabase Storage is required in production.")
     repo = (
         PostgresRepository(settings.database_url)
         if settings.database_url
@@ -66,14 +62,10 @@ def create_app(settings=None, ai=None, pdf=None):
         else GeminiAiProvider(settings.gemini_api_key, settings.gemini_model)
     )
     storage = (
-        SupabaseStorage(
-            settings.supabase_url, settings.supabase_service_role_key, settings.supabase_bucket
-        )
-        if settings.supabase_url and settings.supabase_service_role_key
+        PostgresStorage(settings.database_url)
+        if settings.database_url
         else LocalStorage(settings.data_dir / "uploads")
     )
-    if isinstance(storage, SupabaseStorage):
-        storage.ensure_bucket()
     service = WorkspaceService(
         repo,
         provider,
