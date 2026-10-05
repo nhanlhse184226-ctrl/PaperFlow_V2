@@ -4,7 +4,7 @@ CREATE UNIQUE INDEX users_google_subject_unique ON users(google_subject) WHERE g
 
 CREATE TABLE billing_orders (
   id TEXT PRIMARY KEY,
-  order_code INTEGER NOT NULL UNIQUE,
+  order_code BIGINT NOT NULL UNIQUE,
   user_id TEXT NOT NULL REFERENCES users(id),
   plan_id TEXT NOT NULL,
   plan_name TEXT NOT NULL,

@@ -56,6 +56,13 @@ class PostgresRepository:
                     # only standard constraints, so it is shared with SQLite.
                     db.execute(migration.read_text(encoding="utf-8"))
                     db.execute("INSERT INTO migrations VALUES (?)", (migration.name,))
+            # Earlier hosted deployments created order_code as PostgreSQL int4.
+            # PayOS order codes use larger safe JavaScript integers; widening
+            # this column preserves existing orders and is transactional.
+            upgrade = "pg_006_billing_order_bigint"
+            if not db.execute("SELECT 1 FROM migrations WHERE version=?", (upgrade,)).fetchone():
+                db.execute("ALTER TABLE billing_orders ALTER COLUMN order_code TYPE BIGINT")
+                db.execute("INSERT INTO migrations VALUES (?)", (upgrade,))
 
     @contextmanager
     def connect(self):
