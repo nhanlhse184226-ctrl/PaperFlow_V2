@@ -180,7 +180,13 @@ function ProjectWorkspace() {
           </p>
           <a
             className="button primary"
-            href={apiUrl(base + "/sources/" + selected.source_id + "/file#page=" + selected.page)}
+            href={apiUrl(
+              base +
+                "/sources/" +
+                selected.source_id +
+                "/file#page=" +
+                selected.page,
+            )}
             target="_blank"
             rel="noreferrer"
           >

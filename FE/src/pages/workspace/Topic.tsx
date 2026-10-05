@@ -7,35 +7,52 @@ import type { Analysis, Context, WorkspaceProps } from "../../types";
 const pendingTranslations = new Map<string, Promise<Analysis>>();
 export default function Topic({ p, run, busy, base }: WorkspaceProps) {
   const language = useLanguage();
-  const [translation, setTranslation] = useState<{ key: string; analysis: Analysis } | null>(null);
+  const [translation, setTranslation] = useState<{
+    key: string;
+    analysis: Analysis;
+  } | null>(null);
   const [translationError, setTranslationError] = useState("");
   const [retry, setRetry] = useState(0);
   const translationKey = JSON.stringify([base, p.analysis, language]);
-  const needsTranslation = !!p.analysis && language !== (p.context.output_language ?? "en");
+  const needsTranslation =
+    !!p.analysis && language !== (p.context.output_language ?? "en");
   useEffect(() => {
     let current = true;
     setTranslationError("");
     if (needsTranslation) {
       let request = pendingTranslations.get(translationKey);
       if (!request) {
-        request = api<Analysis>(base + "/topic/translation", "POST", { language });
+        request = api<Analysis>(base + "/topic/translation", "POST", {
+          language,
+        });
         pendingTranslations.set(translationKey, request);
-        void request.finally(() => pendingTranslations.delete(translationKey)).catch(() => {});
+        void request
+          .finally(() => pendingTranslations.delete(translationKey))
+          .catch(() => {});
       }
       request
-        .then((analysis) => { if (current) setTranslation({ key: translationKey, analysis }); })
-        .catch((error) => { if (current) setTranslationError(message(error)); });
+        .then((analysis) => {
+          if (current) setTranslation({ key: translationKey, analysis });
+        })
+        .catch((error) => {
+          if (current) setTranslationError(message(error));
+        });
     }
-    return () => { current = false; };
+    return () => {
+      current = false;
+    };
   }, [base, language, needsTranslation, translationKey, retry]);
   const analysis = needsTranslation
-    ? (translation?.key === translationKey ? translation.analysis : null)
+    ? translation?.key === translationKey
+      ? translation.analysis
+      : null
     : p.analysis;
   const [context, setContext] = useState<Context>(p.context);
   useEffect(() => setContext(p.context), [p.context]);
   const change = (key: keyof Context, value: string | number) =>
     setContext((c) => ({ ...c, [key]: value }));
-  const save = () => api(base + "/topic", "PUT", { ...context, output_language: language });
+  const save = () =>
+    api(base + "/topic", "PUT", { ...context, output_language: language });
   return (
     <div className="topic-layout">
       <section className="panel">
@@ -153,11 +170,25 @@ export default function Topic({ p, run, busy, base }: WorkspaceProps) {
       <section className="analysis-column">
         {needsTranslation && !analysis ? (
           <div className="panel" data-no-ui-translation>
-            {translationError ? <Notice>
-              <p>{language === "vi" ? "Chưa dịch được kết quả. Bản gốc vẫn được lưu an toàn." : "Translation failed. The original result is preserved."}</p>
-              <p>{translationError}</p>
-              <button onClick={() => setRetry((value) => value + 1)}>{language === "vi" ? "Thử dịch lại" : "Retry translation"}</button>
-            </Notice> : <p role="status">{language === "vi" ? "Đang dịch kết quả phân tích sang tiếng Việt…" : "Translating analysis into English…"}</p>}
+            {translationError ? (
+              <Notice>
+                <p>
+                  {language === "vi"
+                    ? "Chưa dịch được kết quả. Bản gốc vẫn được lưu an toàn."
+                    : "Translation failed. The original result is preserved."}
+                </p>
+                <p>{translationError}</p>
+                <button onClick={() => setRetry((value) => value + 1)}>
+                  {language === "vi" ? "Thử dịch lại" : "Retry translation"}
+                </button>
+              </Notice>
+            ) : (
+              <p role="status">
+                {language === "vi"
+                  ? "Đang dịch kết quả phân tích sang tiếng Việt…"
+                  : "Translating analysis into English…"}
+              </p>
+            )}
           </div>
         ) : analysis ? (
           <>

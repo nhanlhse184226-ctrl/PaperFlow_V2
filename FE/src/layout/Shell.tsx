@@ -43,25 +43,45 @@ export default function Shell({
   }, [menu]);
   return (
     <div className="app-shell">
-      <a className="skip-link" href="#workspace-content">{language === "vi" ? "Đến nội dung chính" : "Skip to main content"}</a>
+      <a className="skip-link" href="#workspace-content">
+        {language === "vi" ? "Đến nội dung chính" : "Skip to main content"}
+      </a>
       <button
         ref={menuButton}
         className="mobile-menu"
-        aria-label={language === "vi" ? "Mở hoặc đóng điều hướng" : "Toggle navigation"}
+        aria-label={
+          language === "vi" ? "Mở hoặc đóng điều hướng" : "Toggle navigation"
+        }
         aria-expanded={menu}
         aria-controls="workspace-navigation"
         onClick={() => setMenu(!menu)}
       >
         <Menu />
       </button>
-      {menu && <button className="navigation-backdrop" aria-label={language === "vi" ? "Đóng điều hướng" : "Close navigation"} onClick={() => { setMenu(false); menuButton.current?.focus(); }} />}
+      {menu && (
+        <button
+          className="navigation-backdrop"
+          aria-label={
+            language === "vi" ? "Đóng điều hướng" : "Close navigation"
+          }
+          onClick={() => {
+            setMenu(false);
+            menuButton.current?.focus();
+          }}
+        />
+      )}
       <aside
         id="workspace-navigation"
         className={"sidebar " + (menu ? "open" : "")}
       >
         <Brand />
         <div className="workspace-label">PERSONAL WORKSPACE</div>
-        <nav aria-label={language === "vi" ? "Điều hướng chính" : "Main navigation"} onClick={() => setMenu(false)}>
+        <nav
+          aria-label={
+            language === "vi" ? "Điều hướng chính" : "Main navigation"
+          }
+          onClick={() => setMenu(false)}
+        >
           <NavLink to="/" end>
             <LayoutDashboard size={18} />
             Overview
@@ -78,10 +98,12 @@ export default function Shell({
             <CreditCard size={18} />
             Plans & billing
           </NavLink>
-          {user.role === "ADMIN" && <NavLink to="/admin">
-            <Shield size={18} />
-            Admin dashboard
-          </NavLink>}
+          {user.role === "ADMIN" && (
+            <NavLink to="/admin">
+              <Shield size={18} />
+              Admin dashboard
+            </NavLink>
+          )}
         </nav>
         <div className="sidebar-guide">
           <span className="small-icon">
@@ -121,20 +143,30 @@ export default function Shell({
             <span className="green-dot" /> Thoughtful research. Traceable
             evidence.
           </span>
+          <button
+            type="button"
+            className="topbar-logout"
+            onClick={() => logout().catch((e) => setError(message(e)))}
+          >
+            <LogOut size={16} aria-hidden="true" />
+            Sign out
+          </button>
           <LanguageToggle />
         </header>
         {error && <Notice>{error}</Notice>}
         <div id="workspace-content" tabIndex={-1} className="workspace-content">
-        <Routes>
-          <Route path="/" element={<Dashboard />} />
-          <Route path="/projects" element={<Dashboard all />} />
-          <Route path="/projects/:pid/:tab?" element={<Workspace />} />
-          <Route path="/hub" element={<Hub />} />
-          <Route path="/billing" element={<Billing />} />
-          <Route path="/billing/result" element={<Billing />} />
-          {user.role === "ADMIN" && <Route path="/admin" element={<Admin />} />}
-          <Route path="*" element={<Navigate to="/" replace />} />
-        </Routes>
+          <Routes>
+            <Route path="/" element={<Dashboard />} />
+            <Route path="/projects" element={<Dashboard all />} />
+            <Route path="/projects/:pid/:tab?" element={<Workspace />} />
+            <Route path="/hub" element={<Hub />} />
+            <Route path="/billing" element={<Billing />} />
+            <Route path="/billing/result" element={<Billing />} />
+            {user.role === "ADMIN" && (
+              <Route path="/admin" element={<Admin logout={logout} />} />
+            )}
+            <Route path="*" element={<Navigate to="/" replace />} />
+          </Routes>
         </div>
         <footer className="footer">
           PAPERFLOW <span>Make every claim count.</span>

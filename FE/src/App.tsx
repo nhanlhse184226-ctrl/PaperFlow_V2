@@ -37,7 +37,15 @@ export default function App() {
         <button onClick={load}>Retry connection</button>
       </div>
     );
-  if (!user) return <><div className="auth-language"><LanguageToggle /></div><Auth onLogin={setUser} /></>;
+  if (!user)
+    return (
+      <>
+        <div className="auth-language">
+          <LanguageToggle />
+        </div>
+        <Auth onLogin={setUser} />
+      </>
+    );
   return (
     <>
       <Shell
