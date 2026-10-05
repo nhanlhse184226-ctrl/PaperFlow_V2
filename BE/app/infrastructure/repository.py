@@ -8,8 +8,9 @@ from app.application.models import AppError, Project, now, uid
 
 
 class SqliteRepository:
-    def __init__(self, path: Path):
+    def __init__(self, path: Path, enforce_new_projects: bool = False):
         self.path = path
+        self.enforce_new_projects = enforce_new_projects
         path.parent.mkdir(parents=True, exist_ok=True)
         with self.connect() as db:
             db.execute("PRAGMA journal_mode=WAL")
@@ -34,12 +35,13 @@ class SqliteRepository:
     def create(self, project):
         with self.connect() as db:
             db.execute(
-                "INSERT INTO projects VALUES (?,?,?,?)",
+                "INSERT INTO projects (id,owner_id,version,data,billing_enforced) VALUES (?,?,?,?,?)",
                 (
                     project.id,
                     project.owner_id,
                     0,
                     project.model_dump_json(exclude={"sources", "drafts", "comparisons"}),
+                    int(self.enforce_new_projects),
                 ),
             )
 
@@ -180,11 +182,11 @@ class SqliteRepository:
             ).fetchone()
             return dict(r) if r else None
 
-    def register(self, email, password_hash):
+    def register(self, email, password_hash, role="USER"):
         user_id = uid()
         with self.connect() as db:
             try:
-                db.execute("INSERT INTO users VALUES (?,?,?)", (user_id, email, password_hash))
+                db.execute("INSERT INTO users (id,email,password_hash,role) VALUES (?,?,?,?)", (user_id, email, password_hash, role))
             except sqlite3.IntegrityError:
                 raise AppError("An account with this email already exists.", 409) from None
         return user_id
@@ -194,6 +196,10 @@ class SqliteRepository:
             r = db.execute("SELECT * FROM users WHERE email=?", (email,)).fetchone()
             return dict(r) if r else None
 
+    def set_role(self, email, role):
+        with self.connect() as db:
+            db.execute("UPDATE users SET role=? WHERE email=?", (role, email))
+
     def session(self, token_hash, user_id, expires):
         with self.connect() as db:
             db.execute("DELETE FROM sessions WHERE expires<?", (time.time(),))
@@ -202,7 +208,7 @@ class SqliteRepository:
     def authenticate(self, token_hash):
         with self.connect() as db:
             r = db.execute(
-                "SELECT users.id,users.email FROM users JOIN sessions ON users.id=sessions.user_id WHERE token_hash=? AND expires>?",
+                "SELECT users.id,users.email,users.role FROM users JOIN sessions ON users.id=sessions.user_id WHERE token_hash=? AND expires>?",
                 (token_hash, time.time()),
             ).fetchone()
             return dict(r) if r else None
@@ -224,3 +230,56 @@ class SqliteRepository:
     def post_note(self, owner, topic, note):
         with self.connect() as db:
             db.execute("INSERT INTO notes VALUES (?,?,?,?,?)", (uid(), owner, topic, note, now()))
+
+    def create_billing_order(self, order):
+        with self.connect() as db:
+            db.execute("""INSERT INTO billing_orders
+                (id,order_code,user_id,project_id,project_name,plan_id,plan_name,amount,status,payment_link_id,checkout_url,created_at,paid_at,provider_reference)
+                VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)""", tuple(order[key] for key in (
+                "id","order_code","user_id","project_id","project_name","plan_id","plan_name","amount","status","payment_link_id","checkout_url","created_at","paid_at","provider_reference")))
+
+    def project_billing_state(self, user_id, project_id):
+        with self.connect() as db:
+            row = db.execute("SELECT billing_enforced FROM projects WHERE id=? AND owner_id=?", (project_id, user_id)).fetchone()
+            if not row:
+                raise AppError("Project not found.", 404)
+            plan = db.execute("""SELECT plan_id FROM billing_orders
+                WHERE project_id=? AND user_id=? AND status='PAID'
+                ORDER BY CASE plan_id WHEN 'pro' THEN 3 WHEN 'research' THEN 2 WHEN 'starter' THEN 1 ELSE 0 END DESC,
+                paid_at DESC LIMIT 1""", (project_id, user_id)).fetchone()
+            return {"billing_enforced": bool(row["billing_enforced"]), "plan_id": plan["plan_id"] if plan else "free"}
+
+    def mark_billing_paid(self, order_code, paid_at, reference):
+        with self.connect() as db:
+            return db.execute("""UPDATE billing_orders SET status='PAID',paid_at=?,provider_reference=?
+                WHERE order_code=? AND status='PENDING' AND payment_link_id IS NOT NULL""",
+                (paid_at, reference, order_code)).rowcount
+
+    def mark_billing_cancelled(self, order_code, status):
+        with self.connect() as db:
+            return db.execute("UPDATE billing_orders SET status=? WHERE order_code=? AND status='PENDING'",
+                              (status, order_code)).rowcount
+
+    def billing_order(self, order_code):
+        with self.connect() as db:
+            row = db.execute("SELECT * FROM billing_orders WHERE order_code=?", (order_code,)).fetchone()
+            return dict(row) if row else None
+
+    def update_billing_order(self, order_code, **fields):
+        if not fields:
+            return
+        with self.connect() as db:
+            columns = ", ".join(f"{key}=?" for key in fields)
+            db.execute(f"UPDATE billing_orders SET {columns} WHERE order_code=?", (*fields.values(), order_code))
+
+    def billing_orders(self, user_id):
+        with self.connect() as db:
+            return [dict(row) for row in db.execute("SELECT * FROM billing_orders WHERE user_id=? ORDER BY created_at DESC", (user_id,))]
+
+    def billing_overview(self):
+        with self.connect() as db:
+            total = db.execute("SELECT COUNT(*) AS orders, COALESCE(SUM(amount),0) AS revenue, COUNT(DISTINCT user_id) AS customers FROM billing_orders WHERE status='PAID'").fetchone()
+            pending = db.execute("SELECT COUNT(*) AS count FROM billing_orders WHERE status='PENDING'").fetchone()
+            trend = [dict(row) for row in db.execute("SELECT substr(COALESCE(paid_at,created_at),1,10) AS day, COALESCE(SUM(CASE WHEN status='PAID' THEN amount ELSE 0 END),0) AS revenue, COUNT(CASE WHEN status='PAID' THEN 1 END) AS orders FROM billing_orders GROUP BY day ORDER BY day DESC LIMIT 7").fetchall()][::-1]
+            recent = [dict(row) for row in db.execute("SELECT billing_orders.*, users.email FROM billing_orders JOIN users ON users.id=billing_orders.user_id ORDER BY created_at DESC LIMIT 10").fetchall()]
+            return {"revenue": total["revenue"], "paid_orders": total["orders"], "customers": total["customers"], "pending_orders": pending["count"], "trend": trend, "recent_orders": recent}

@@ -42,8 +42,9 @@ class _Connection:
 
 
 class PostgresRepository:
-    def __init__(self, database_url: str):
+    def __init__(self, database_url: str, enforce_new_projects: bool = False):
         self.database_url = database_url
+        self.enforce_new_projects = enforce_new_projects
         with self.connect() as db:
             db.execute("CREATE TABLE IF NOT EXISTS migrations (version TEXT PRIMARY KEY)")
             for migration in sorted(Path(__file__).with_name("migrations").glob("*.sql")):
@@ -64,12 +65,13 @@ class PostgresRepository:
     def create(self, project):
         with self.connect() as db:
             db.execute(
-                "INSERT INTO projects VALUES (?,?,?,?)",
+                "INSERT INTO projects (id,owner_id,version,data,billing_enforced) VALUES (?,?,?,?,?)",
                 (
                     project.id,
                     project.owner_id,
                     0,
                     project.model_dump_json(exclude={"sources", "drafts", "comparisons"}),
+                    int(self.enforce_new_projects),
                 ),
             )
 
@@ -209,12 +211,12 @@ class PostgresRepository:
             ).fetchone()
             return dict(row) if row else None
 
-    def register(self, email, password_hash):
+    def register(self, email, password_hash, role="USER"):
         user_id = uid()
         with self.connect() as db:
             changed = db.execute(
-                "INSERT INTO users VALUES (?,?,?) ON CONFLICT (email) DO NOTHING",
-                (user_id, email, password_hash),
+                "INSERT INTO users (id,email,password_hash,role) VALUES (?,?,?,?) ON CONFLICT (email) DO NOTHING",
+                (user_id, email, password_hash, role),
             ).rowcount
             if not changed:
                 raise AppError("An account with this email already exists.", 409) from None
@@ -225,6 +227,10 @@ class PostgresRepository:
             row = db.execute("SELECT * FROM users WHERE email=?", (email,)).fetchone()
             return dict(row) if row else None
 
+    def set_role(self, email, role):
+        with self.connect() as db:
+            db.execute("UPDATE users SET role=? WHERE email=?", (role, email))
+
     def session(self, token_hash, user_id, expires):
         with self.connect() as db:
             db.execute("DELETE FROM sessions WHERE expires<?", (time.time(),))
@@ -233,7 +239,7 @@ class PostgresRepository:
     def authenticate(self, token_hash):
         with self.connect() as db:
             row = db.execute(
-                "SELECT users.id,users.email FROM users JOIN sessions ON users.id=sessions.user_id WHERE token_hash=? AND expires>?",
+                "SELECT users.id,users.email,users.role FROM users JOIN sessions ON users.id=sessions.user_id WHERE token_hash=? AND expires>?",
                 (token_hash, time.time()),
             ).fetchone()
             return dict(row) if row else None
@@ -255,3 +261,56 @@ class PostgresRepository:
     def post_note(self, owner, topic, note):
         with self.connect() as db:
             db.execute("INSERT INTO notes VALUES (?,?,?,?,?)", (uid(), owner, topic, note, now()))
+
+    def create_billing_order(self, order):
+        with self.connect() as db:
+            db.execute("""INSERT INTO billing_orders
+                (id,order_code,user_id,project_id,project_name,plan_id,plan_name,amount,status,payment_link_id,checkout_url,created_at,paid_at,provider_reference)
+                VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)""", tuple(order[key] for key in (
+                "id","order_code","user_id","project_id","project_name","plan_id","plan_name","amount","status","payment_link_id","checkout_url","created_at","paid_at","provider_reference")))
+
+    def project_billing_state(self, user_id, project_id):
+        with self.connect() as db:
+            row = db.execute("SELECT billing_enforced FROM projects WHERE id=? AND owner_id=?", (project_id, user_id)).fetchone()
+            if not row:
+                raise AppError("Project not found.", 404)
+            plan = db.execute("""SELECT plan_id FROM billing_orders
+                WHERE project_id=? AND user_id=? AND status='PAID'
+                ORDER BY CASE plan_id WHEN 'pro' THEN 3 WHEN 'research' THEN 2 WHEN 'starter' THEN 1 ELSE 0 END DESC,
+                paid_at DESC LIMIT 1""", (project_id, user_id)).fetchone()
+            return {"billing_enforced": bool(row["billing_enforced"]), "plan_id": plan["plan_id"] if plan else "free"}
+
+    def mark_billing_paid(self, order_code, paid_at, reference):
+        with self.connect() as db:
+            return db.execute("""UPDATE billing_orders SET status='PAID',paid_at=?,provider_reference=?
+                WHERE order_code=? AND status='PENDING' AND payment_link_id IS NOT NULL""",
+                (paid_at, reference, order_code)).rowcount
+
+    def mark_billing_cancelled(self, order_code, status):
+        with self.connect() as db:
+            return db.execute("UPDATE billing_orders SET status=? WHERE order_code=? AND status='PENDING'",
+                              (status, order_code)).rowcount
+
+    def billing_order(self, order_code):
+        with self.connect() as db:
+            row = db.execute("SELECT * FROM billing_orders WHERE order_code=?", (order_code,)).fetchone()
+            return dict(row) if row else None
+
+    def update_billing_order(self, order_code, **fields):
+        if not fields:
+            return
+        with self.connect() as db:
+            columns = ", ".join(f"{key}=?" for key in fields)
+            db.execute(f"UPDATE billing_orders SET {columns} WHERE order_code=?", (*fields.values(), order_code))
+
+    def billing_orders(self, user_id):
+        with self.connect() as db:
+            return [dict(row) for row in db.execute("SELECT * FROM billing_orders WHERE user_id=? ORDER BY created_at DESC", (user_id,))]
+
+    def billing_overview(self):
+        with self.connect() as db:
+            total = db.execute("SELECT COUNT(*) AS orders, COALESCE(SUM(amount),0) AS revenue, COUNT(DISTINCT user_id) AS customers FROM billing_orders WHERE status='PAID'").fetchone()
+            pending = db.execute("SELECT COUNT(*) AS count FROM billing_orders WHERE status='PENDING'").fetchone()
+            trend = [dict(row) for row in db.execute("SELECT substr(COALESCE(paid_at,created_at),1,10) AS day, COALESCE(SUM(CASE WHEN status='PAID' THEN amount ELSE 0 END),0) AS revenue, COUNT(CASE WHEN status='PAID' THEN 1 END) AS orders FROM billing_orders GROUP BY day ORDER BY day DESC LIMIT 7").fetchall()][::-1]
+            recent = [dict(row) for row in db.execute("SELECT billing_orders.*, users.email FROM billing_orders JOIN users ON users.id=billing_orders.user_id ORDER BY created_at DESC LIMIT 10").fetchall()]
+            return {"revenue": total["revenue"], "paid_orders": total["orders"], "customers": total["customers"], "pending_orders": pending["count"], "trend": trend, "recent_orders": recent}

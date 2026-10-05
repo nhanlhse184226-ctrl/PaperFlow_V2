@@ -11,7 +11,7 @@ from app.application.models import AppError, Context, Model
 
 class Credentials(Model):
     email: str = Field(max_length=254)
-    password: str = Field(min_length=12, max_length=128)
+    password: str = Field(min_length=3, max_length=128)
 
 
 class Name(Model):
@@ -40,7 +40,12 @@ class NoteInput(Model):
     note: str = Field(min_length=10, max_length=3000)
 
 
-def create_router(service, auth, settings):
+class CheckoutInput(Model):
+    project_id: str = Field(min_length=1, max_length=100)
+    plan_id: Literal["starter", "research", "pro"]
+
+
+def create_router(service, auth, settings, billing=None):
     router = APIRouter(prefix="/api")
     attempts = defaultdict(deque)
     guard = Lock()
@@ -50,6 +55,11 @@ def create_router(service, auth, settings):
 
     def owner(current=Depends(user)):
         return current["id"]
+
+    def admin(current=Depends(user)):
+        if current.get("role") != "ADMIN":
+            raise AppError("Bạn không có quyền truy cập trang quản trị.", 403)
+        return current
 
     @router.get("/health")
     def health():
@@ -105,6 +115,30 @@ def create_router(service, auth, settings):
             samesite=settings.cookie_samesite,
         )
         return {"ok": True}
+
+    @router.get("/billing/plans")
+    def plans():
+        return billing.plans()
+
+    @router.get("/billing/me")
+    def my_billing(current=Depends(user)):
+        return billing.mine(current["id"])
+
+    @router.post("/billing/checkout")
+    def checkout(body: CheckoutInput, current=Depends(user)):
+        return billing.create_checkout(current["id"], body.project_id, body.plan_id)
+
+    @router.post("/billing/orders/{order_code}/refresh")
+    def refresh_order(order_code: int, current=Depends(user)):
+        return billing.refresh_order(current["id"], order_code)
+
+    @router.post("/billing/payos/webhook")
+    async def payos_webhook(request: Request):
+        return billing.webhook(await request.body())
+
+    @router.get("/admin/overview")
+    def admin_overview(current=Depends(admin)):
+        return billing.overview()
 
     @router.get("/projects")
     def projects(oid=Depends(owner)):

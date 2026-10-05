@@ -85,6 +85,12 @@ This starts PaperFlow at **http://localhost:8080** with `AI_PROVIDER=ollama`; it
 | `SECURE_COOKIES` | Must be `true` in production; requires HTTPS |
 | `ALLOWED_ORIGINS` | Comma-separated exact browser origins authorized for writes |
 | `ALLOWED_HOSTS` | Comma-separated API hostnames; include `127.0.0.1` for container health checks |
+| `INITIAL_ADMIN_EMAIL` | Existing account promoted to `ADMIN` after the next successful sign-in |
+| `BOOTSTRAP_ADMIN_EMAIL` / `BOOTSTRAP_ADMIN_PASSWORD` | One-time administrator bootstrap; remove after confirming the account |
+| `PAYOS_CLIENT_ID`, `PAYOS_API_KEY`, `PAYOS_CHECKSUM_KEY` | Server-only PayOS channel credentials |
+| `PAYOS_RETURN_URL`, `PAYOS_CANCEL_URL` | Frontend result page URLs; they never confirm payment |
+
+Each new project starts with one PDF and one draft. Starter (39,000 VND) allows 5 PDFs and 1 draft; Research (79,000 VND) allows 15 PDFs and 3 drafts; Pro (99,000 VND) allows 30 PDFs and 20 drafts. Each payment is one-time for its selected project. Existing projects keep their prior unlimited source/draft rights. Upgrades increase limits; the checkout amount is the full displayed package price. Only a signature-verified PayOS webhook activates a purchase. A real bank transfer is required to verify that final activation path end to end.
 
 Development `.env` is read from the backend working directory. Docker Compose reads root `.env`. No frontend secret or production localhost URL is embedded in the bundle. Fonts use Google Fonts with local sans-serif fallbacks.
 

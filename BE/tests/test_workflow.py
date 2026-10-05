@@ -12,7 +12,8 @@ from tests.fakes import CLAIM, QUOTE, FakeAi, pdf_bytes
 @pytest.fixture
 def setup(tmp_path):
     ai = FakeAi()
-    app = create_app(Settings(data_dir=tmp_path, allowed_origins="http://testserver"), ai=ai)
+    app = create_app(Settings(data_dir=tmp_path, allowed_origins="http://testserver", allowed_hosts="testserver",
+                              payos_client_id="", payos_api_key="", payos_checksum_key=""), ai=ai)
     with TestClient(app) as client:
         response = client.post(
             "/api/auth/register", json={"email": "student@example.edu", "password": "correct horse battery"}
@@ -114,7 +115,7 @@ def test_complete_workflow_and_persistence(setup):
     assert p.drafts[0].claims[0].check.matches[0].evidence_id in {e.id for s in p.sources for e in s.evidence}
     with sqlite3.connect(app.state.repo.path) as db:
         assert db.execute("PRAGMA foreign_key_check").fetchall() == []
-        assert db.execute("SELECT COUNT(*) FROM migrations").fetchone()[0] == 2
+        assert db.execute("SELECT COUNT(*) FROM migrations").fetchone()[0] == 5
     assert client.delete(base + f"/sources/{first}").status_code == 200
     p = client.get(base).json()
     assert p["comparisons"] == []
@@ -284,7 +285,8 @@ def test_hub_and_project_deletion(setup):
 
 
 def test_missing_configuration_is_actionable_api_error(tmp_path):
-    app = create_app(Settings(data_dir=tmp_path, gemini_api_key=""))
+    app = create_app(Settings(data_dir=tmp_path, gemini_api_key="", allowed_hosts="testserver",
+                              payos_client_id="", payos_api_key="", payos_checksum_key=""))
     with TestClient(app) as client:
         client.post(
             "/api/auth/register", json={"email": "no-key@example.edu", "password": "a long test password"}

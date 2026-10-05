@@ -19,12 +19,18 @@ and **Vercel Free** for the React site. The backend creates the private
    `GEMINI_API_KEY` in Render's secret environment settings. Set
    `ALLOWED_HOSTS` to the generated Render hostname and temporarily set
    `ALLOWED_ORIGINS` to the future Vercel origin after it is known.
-3. Deploy the frontend root directory `FE` on Vercel. Set `VITE_API_URL` to the
-   HTTPS origin of the Render API, without `/api`. Then add that exact Vercel
-   origin to Render's `ALLOWED_ORIGINS`; no wildcard origins are accepted for
-   authenticated requests.
+3. Deploy the frontend root directory `FE` on Vercel. Its `/api/*` rewrite
+   forwards to the Render API while keeping session cookies on the Vercel site.
+   Do not set `VITE_API_URL`: the frontend always calls relative `/api` URLs.
+   Add the exact Vercel origin to Render's `ALLOWED_ORIGINS` for write requests.
 4. In Vercel set the build command to `npm run build` and output directory to
-   `dist`. Add the SPA rewrite below in `FE/vercel.json` before deployment.
+   `dist`. `FE/vercel.json` contains both the API proxy and SPA rewrite.
+5. Add `PAYOS_CLIENT_ID`, `PAYOS_API_KEY`, and `PAYOS_CHECKSUM_KEY` only to the
+   Render backend environment. Set both `PAYOS_RETURN_URL` and
+   `PAYOS_CANCEL_URL` to `https://paper-flow-v2.vercel.app/billing/result`.
+   Deploy, then register `https://paperflow-api.onrender.com/api/billing/payos/webhook`
+   in PayOS; the webhook must be accepted before any paid plan can activate.
+   A browser return or PayOS status lookup never grants rights by itself.
 
 The first cold request to a Render Free service can be slow. Supabase Free has
 finite capacity, so export production data regularly. Render Free does not

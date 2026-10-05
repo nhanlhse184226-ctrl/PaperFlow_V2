@@ -7,6 +7,8 @@ import {
   LayoutDashboard,
   LogOut,
   Menu,
+  CreditCard,
+  Shield,
   Users,
 } from "lucide-react";
 import { Notice, Brand, message } from "../ui";
@@ -14,6 +16,8 @@ import type { User } from "../types";
 import Dashboard from "../pages/Dashboard";
 import Hub from "../pages/Hub";
 import Workspace from "../pages/Workspace";
+import Billing from "../pages/Billing";
+import Admin from "../pages/Admin";
 import { LanguageToggle, useLanguage } from "../i18n";
 export default function Shell({
   user,
@@ -70,6 +74,14 @@ export default function Shell({
             <Users size={18} />
             Topic experience hub
           </NavLink>
+          <NavLink to="/billing">
+            <CreditCard size={18} />
+            Plans & billing
+          </NavLink>
+          {user.role === "ADMIN" && <NavLink to="/admin">
+            <Shield size={18} />
+            Admin dashboard
+          </NavLink>}
         </nav>
         <div className="sidebar-guide">
           <span className="small-icon">
@@ -118,6 +130,9 @@ export default function Shell({
           <Route path="/projects" element={<Dashboard all />} />
           <Route path="/projects/:pid/:tab?" element={<Workspace />} />
           <Route path="/hub" element={<Hub />} />
+          <Route path="/billing" element={<Billing />} />
+          <Route path="/billing/result" element={<Billing />} />
+          {user.role === "ADMIN" && <Route path="/admin" element={<Admin />} />}
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
         </div>

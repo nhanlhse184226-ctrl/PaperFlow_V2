@@ -7,11 +7,9 @@ export class ApiError extends Error {
   }
 }
 
-const configuredApiUrl = import.meta.env.VITE_API_URL?.replace(/\/$/, "");
-
-/** Builds an API URL for local proxying or a separately hosted API. */
+/** Keep session cookies first-party on Vite, Docker, and Vercel. */
 export function apiUrl(path: string): string {
-  return (configuredApiUrl || "") + "/api" + path;
+  return "/api" + path;
 }
 
 export async function api<T>(
@@ -22,7 +20,7 @@ export async function api<T>(
   const form = data instanceof FormData;
   const response = await fetch(apiUrl(path), {
     method,
-    credentials: configuredApiUrl ? "include" : "same-origin",
+    credentials: "same-origin",
     headers: data && !form ? { "Content-Type": "application/json" } : undefined,
     body: data ? (form ? data : JSON.stringify(data)) : undefined,
   });

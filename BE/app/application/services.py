@@ -6,6 +6,7 @@ import time
 from contextlib import contextmanager
 
 from .models import AppError, Check, Claim, Context, Draft, Evidence, Project, Source, Support
+from .billing import project_limits
 from .ports import AiProvider, FileStorage, PdfExtractor, Repository
 
 
@@ -29,19 +30,38 @@ def invalidate_reports(project):
 
 
 class AuthService:
-    def __init__(self, repo: Repository):
+    def __init__(self, repo: Repository, initial_admin_email: str = ""):
         self.repo = repo
+        self.initial_admin_email = initial_admin_email.strip().lower()
+
+    def role_for(self, email):
+        return "ADMIN" if email == self.initial_admin_email else "USER"
+
+    @staticmethod
+    def password_hash(password):
+        salt = secrets.token_hex(16)
+        digest = hashlib.scrypt(password.encode(), salt=bytes.fromhex(salt), n=16384, r=8, p=1).hex()
+        return salt + ":" + digest
+
+    def bootstrap_admin(self, email: str, password: str):
+        """Create the explicitly configured emergency admin exactly once."""
+        email = email.strip().lower()
+        if not email or not password:
+            return
+        existing = self.repo.user(email)
+        if existing:
+            self.repo.set_role(email, "ADMIN")
+            return
+        self.repo.register(email, self.password_hash(password), "ADMIN")
 
     def login(self, email, password, register=False):
         email = email.strip().lower()
         if not re.fullmatch(r"[^\s@]+@[^\s@]+\.[^\s@]+", email) or len(email) > 254:
             raise AppError("Enter a valid email address.")
-        if len(password) < 12 or len(password) > 128:
-            raise AppError("Use a password between 12 and 128 characters.")
+        if len(password) < 3 or len(password) > 128:
+            raise AppError("Use a password between 3 and 128 characters.")
         if register:
-            salt = secrets.token_hex(16)
-            digest = hashlib.scrypt(password.encode(), salt=bytes.fromhex(salt), n=16384, r=8, p=1).hex()
-            user_id = self.repo.register(email, salt + ":" + digest)
+            user_id = self.repo.register(email, self.password_hash(password), self.role_for(email))
         else:
             user = self.repo.user(email)
             stored = user["password_hash"] if user else ("00" * 16 + ":" + "00" * 64)
@@ -50,9 +70,12 @@ class AuthService:
             if not hmac.compare_digest(actual, expected) or not user:
                 raise AppError("Email or password is incorrect.", 401)
             user_id = user["id"]
+            if self.role_for(email) == "ADMIN":
+                self.repo.set_role(email, "ADMIN")
         token = secrets.token_urlsafe(32)
         self.repo.session(hashlib.sha256(token.encode()).hexdigest(), user_id, time.time() + 604800)
-        return token, {"id": user_id, "email": email}
+        current = self.repo.user(email) or {"role": self.role_for(email)}
+        return token, {"id": user_id, "email": email, "role": current.get("role", "USER")}
 
     def authenticate(self, token):
         user = self.repo.authenticate(hashlib.sha256(token.encode()).hexdigest()) if token else None
@@ -182,12 +205,15 @@ class WorkspaceService:
         if len(content) > 20 * 1024 * 1024:
             raise AppError("PDF must be 20 MB or smaller.", 413)
         with self.editing(owner, pid, "Extracting PDF pages") as p:
-            if len(p.sources) >= 30:
-                raise AppError("Each project supports up to 30 sources.")
             digest = hashlib.sha256(content).hexdigest()
             existing = next((s for s in p.sources if s.digest == digest), None)
             if existing:
                 return existing.id
+            limits = project_limits(self.repo.project_billing_state(owner, pid))
+            if limits and len(p.sources) >= limits[0]:
+                raise AppError("Đã đạt giới hạn tài liệu của gói hiện tại. Xem Gói dịch vụ để nâng cấp.", 403)
+            if len(p.sources) >= 30:
+                raise AppError("Each project supports up to 30 sources.")
             s = Source(filename=filename.replace("\\", "/").split("/")[-1][:200], digest=digest)
             self.files.put(s.id, content)
             try:
@@ -346,6 +372,9 @@ class WorkspaceService:
                 old.title, old.text, old.claims, old.status, old.error = title, text, [], "saved", None
                 draft = old
             else:
+                limits = project_limits(self.repo.project_billing_state(owner, pid))
+                if limits and len(p.drafts) >= limits[1]:
+                    raise AppError("Đã đạt giới hạn bản thảo của gói hiện tại. Xem Gói dịch vụ để nâng cấp.", 403)
                 if len(p.drafts) >= 20:
                     raise AppError("Each project supports up to 20 drafts.")
                 p.drafts.append(draft)

@@ -107,6 +107,7 @@ export interface Summary {
 export interface User {
   id: string;
   email: string;
+  role: "USER" | "ADMIN";
 }
 
 export type RunAction = (

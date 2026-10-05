@@ -77,11 +77,11 @@ export default function Auth({ onLogin }: { onLogin: (user: User) => void }) {
             <input
               name="password"
               type="password"
-              minLength={12}
+              minLength={3}
               maxLength={128}
               autoComplete={register ? "new-password" : "current-password"}
               required
-              placeholder="At least 12 characters"
+              placeholder="Your password"
             />
           </label>
           {error && <Notice>{error}</Notice>}
