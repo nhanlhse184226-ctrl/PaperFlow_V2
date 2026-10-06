@@ -2,6 +2,7 @@ import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:google_sign_in/google_sign_in.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 
 import '../data/api.dart';
 import '../ui/design.dart';
@@ -223,7 +224,13 @@ class _AuthScreenState extends State<AuthScreen> {
                     width: double.infinity,
                     child: OutlinedButton.icon(
                       onPressed: signInWithGoogle,
-                      icon: const Icon(Icons.login_rounded),
+                      icon: ExcludeSemantics(
+                        child: SvgPicture.asset(
+                          'assets/icons/google_g.svg',
+                          width: 20,
+                          height: 20,
+                        ),
+                      ),
                       label: const Text('Tiếp tục với Google'),
                     ),
                   ),
