@@ -1,4 +1,7 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
+import 'package:google_sign_in/google_sign_in.dart';
 
 import '../data/api.dart';
 import '../ui/design.dart';
@@ -15,6 +18,7 @@ class _AuthScreenState extends State<AuthScreen> {
   final email = TextEditingController(), password = TextEditingController();
   final form = GlobalKey<FormState>();
   bool register = false, busy = false, obscure = true;
+  bool googleInitialized = false;
   Object? error;
   @override
   void dispose() {
@@ -37,6 +41,46 @@ class _AuthScreenState extends State<AuthScreen> {
         register: register,
       );
       if (mounted) widget.onLogin(user);
+    } catch (e) {
+      if (mounted) setState(() => error = e);
+    } finally {
+      if (mounted) setState(() => busy = false);
+    }
+  }
+
+  Future<void> signInWithGoogle() async {
+    if (busy) return;
+    setState(() {
+      busy = true;
+      error = null;
+    });
+    try {
+      final config = await widget.api.googleConfig();
+      final clientId = textOf(config, 'client_id');
+      if (clientId.isEmpty) {
+        throw ApiFailure('Đăng nhập Google chưa được cấu hình.');
+      }
+      if (!googleInitialized) {
+        await GoogleSignIn.instance.initialize(serverClientId: clientId);
+        googleInitialized = true;
+      }
+      final account = await GoogleSignIn.instance.authenticate();
+      final credential = account.authentication.idToken;
+      if (credential == null || credential.isEmpty) {
+        throw ApiFailure(
+          'Google không trả thông tin đăng nhập. Vui lòng thử lại.',
+        );
+      }
+      final user = await widget.api.signInWithGoogle(credential);
+      if (mounted) widget.onLogin(user);
+    } on GoogleSignInException catch (e) {
+      if (mounted && e.code != GoogleSignInExceptionCode.canceled) {
+        setState(
+          () => error = ApiFailure(
+            'Không thể đăng nhập Google. Vui lòng thử lại.',
+          ),
+        );
+      }
     } catch (e) {
       if (mounted) setState(() => error = e);
     } finally {
@@ -159,6 +203,31 @@ class _AuthScreenState extends State<AuthScreen> {
                       label: Text(register ? 'Tạo tài khoản' : 'Đăng nhập'),
                     ),
                   ),
+                if (!busy && Platform.isAndroid) ...[
+                  const SizedBox(height: 12),
+                  const Row(
+                    children: [
+                      Expanded(child: Divider()),
+                      Padding(
+                        padding: EdgeInsets.symmetric(horizontal: 12),
+                        child: Text(
+                          'hoặc',
+                          style: TextStyle(color: muted, fontSize: 12),
+                        ),
+                      ),
+                      Expanded(child: Divider()),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+                  SizedBox(
+                    width: double.infinity,
+                    child: OutlinedButton.icon(
+                      onPressed: signInWithGoogle,
+                      icon: const Icon(Icons.login_rounded),
+                      label: const Text('Tiếp tục với Google'),
+                    ),
+                  ),
+                ],
                 Center(
                   child: TextButton(
                     onPressed: busy

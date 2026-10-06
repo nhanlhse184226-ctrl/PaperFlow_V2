@@ -16,6 +16,7 @@ from app.application.feedback import FeedbackService
 from app.application.services import AuthService, WorkspaceService
 from app.infrastructure.files import LocalStorage, PypdfExtractor
 from app.infrastructure.gemini import GeminiAiProvider
+from app.infrastructure.google_identity import GoogleIdentityVerifier
 from app.infrastructure.ollama import OllamaAiProvider
 from app.infrastructure.postgres_repository import PostgresRepository
 from app.infrastructure.postgres_storage import PostgresStorage
@@ -48,9 +49,10 @@ class Settings(BaseSettings):
     payos_checksum_key: str = ""
     payos_return_url: str = "http://localhost:5173/billing/result"
     payos_cancel_url: str = "http://localhost:5173/billing/result"
+    google_oauth_client_id: str = ""
 
 
-def create_app(settings=None, ai=None, pdf=None, payment_gateway=None):
+def create_app(settings=None, ai=None, pdf=None, payment_gateway=None, google_identity=None):
     ai_logger = logging.getLogger("paperflow.ai")
     ai_logger.setLevel(logging.INFO)
     if not ai_logger.handlers:
@@ -94,7 +96,11 @@ def create_app(settings=None, ai=None, pdf=None, payment_gateway=None):
         redoc_url=None,
         openapi_url="/api/openapi.json" if settings.environment == "development" else None,
     )
-    auth = AuthService(repo, settings.initial_admin_email)
+    auth = AuthService(
+        repo,
+        settings.initial_admin_email,
+        google_identity or GoogleIdentityVerifier(settings.google_oauth_client_id),
+    )
     auth.bootstrap_admin(settings.bootstrap_admin_email, settings.bootstrap_admin_password)
     app.state.service = service
     app.state.repo = repo

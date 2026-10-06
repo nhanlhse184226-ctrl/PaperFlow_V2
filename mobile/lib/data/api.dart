@@ -163,32 +163,50 @@ class PaperApi {
         '/auth/${register ? 'register' : 'login'}',
         data: {'email': email.trim(), 'password': password},
       );
-      Cookie? session;
-      for (final value
-          in response.headers[HttpHeaders.setCookieHeader] ?? <String>[]) {
-        final cookie = Cookie.fromSetCookieValue(value);
-        if (cookie.name == 'paperflow_session') session = cookie;
-      }
-      if (session == null || session.value.isEmpty) {
-        throw ApiFailure(
-          'Máy chủ không trả phiên đăng nhập. Vui lòng thử lại.',
-        );
-      }
-      _token = session.value;
-      final expiry =
-          session.expires ??
-          DateTime.now().add(Duration(seconds: session.maxAge ?? 604800));
-      await sessions.write(
-        jsonEncode({
-          'token': _token,
-          'expires': expiry.toUtc().toIso8601String(),
-        }),
-      );
+      await _persistSession(response);
       // Validate the actual session before opening the workspace.
       return object(await request('/auth/me'));
     } on DioException catch (e) {
       throw failure(e);
     }
+  }
+
+  Future<Json> googleConfig() async =>
+      object(await request('/auth/google/config'));
+
+  Future<Json> signInWithGoogle(String credential) async {
+    try {
+      final response = await dio.post(
+        '/auth/google',
+        data: {'credential': credential},
+      );
+      await _persistSession(response);
+      return object(await request('/auth/me'));
+    } on DioException catch (e) {
+      throw failure(e);
+    }
+  }
+
+  Future<void> _persistSession(Response<dynamic> response) async {
+    Cookie? session;
+    for (final value
+        in response.headers[HttpHeaders.setCookieHeader] ?? <String>[]) {
+      final cookie = Cookie.fromSetCookieValue(value);
+      if (cookie.name == 'paperflow_session') session = cookie;
+    }
+    if (session == null || session.value.isEmpty) {
+      throw ApiFailure('Máy chủ không trả phiên đăng nhập. Vui lòng thử lại.');
+    }
+    _token = session.value;
+    final expiry =
+        session.expires ??
+        DateTime.now().add(Duration(seconds: session.maxAge ?? 604800));
+    await sessions.write(
+      jsonEncode({
+        'token': _token,
+        'expires': expiry.toUtc().toIso8601String(),
+      }),
+    );
   }
 
   Future<void> signOut() async {

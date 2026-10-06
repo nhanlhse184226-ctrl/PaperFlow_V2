@@ -1,9 +1,97 @@
-import { useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { ArrowRight, LoaderCircle, ShieldCheck } from "lucide-react";
 import { api } from "../api";
 import { Notice, Brand, message } from "../ui";
 import type { FormEvent } from "react";
 import type { User } from "../types";
+
+type GoogleCredentialResponse = { credential: string };
+type GoogleConfig = { enabled: boolean; client_id: string };
+
+declare global {
+  interface Window {
+    google?: {
+      accounts: {
+        id: {
+          initialize: (options: {
+            client_id: string;
+            callback: (response: GoogleCredentialResponse) => void;
+            use_fedcm_for_prompt?: boolean;
+          }) => void;
+          renderButton: (
+            parent: HTMLElement,
+            options: { theme: "outline"; size: "large"; text: "continue_with"; width: number },
+          ) => void;
+        };
+      };
+    };
+  }
+}
+
+function GoogleSignIn({
+  busy,
+  onCredential,
+}: {
+  busy: boolean;
+  onCredential: (credential: string) => void;
+}) {
+  const target = useRef<HTMLDivElement>(null);
+  const [config, setConfig] = useState<GoogleConfig | null>(null);
+  const [failed, setFailed] = useState(false);
+
+  useEffect(() => {
+    let active = true;
+    api<GoogleConfig>("/auth/google/config")
+      .then((value) => active && setConfig(value))
+      .catch(() => active && setFailed(true));
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!config?.enabled || !config.client_id || !target.current) return;
+    const render = () => {
+      if (!target.current || !window.google) return;
+      target.current.replaceChildren();
+      window.google.accounts.id.initialize({
+        client_id: config.client_id,
+        callback: ({ credential }) => onCredential(credential),
+        use_fedcm_for_prompt: true,
+      });
+      window.google.accounts.id.renderButton(target.current, {
+        theme: "outline",
+        size: "large",
+        text: "continue_with",
+        width: Math.min(Math.floor(target.current.getBoundingClientRect().width), 390),
+      });
+    };
+    const existing = document.querySelector<HTMLScriptElement>(
+      'script[src="https://accounts.google.com/gsi/client"]',
+    );
+    if (existing) {
+      if (window.google) render();
+      else existing.addEventListener("load", render, { once: true });
+      return () => existing.removeEventListener("load", render);
+    }
+    const script = document.createElement("script");
+    script.src = "https://accounts.google.com/gsi/client";
+    script.async = true;
+    script.onload = render;
+    script.onerror = () => setFailed(true);
+    document.head.append(script);
+    return () => script.remove();
+  }, [config, onCredential]);
+
+  if (!config?.enabled || failed) return null;
+  return (
+    <div className={busy ? "google-sign-in is-busy" : "google-sign-in"} aria-busy={busy}>
+      <div className="auth-divider"><span>or</span></div>
+      <div ref={target} aria-label="Continue with Google" />
+    </div>
+  );
+}
+
 export default function Auth({ onLogin }: { onLogin: (user: User) => void }) {
   const [register, setRegister] = useState(false),
     [busy, setBusy] = useState(false),
@@ -26,6 +114,18 @@ export default function Auth({ onLogin }: { onLogin: (user: User) => void }) {
       setBusy(false);
     }
   }
+  const googleLogin = useCallback(async (credential: string) => {
+    if (busy) return;
+    setBusy(true);
+    setError("");
+    try {
+      onLogin(await api<User>("/auth/google", "POST", { credential }));
+    } catch (e) {
+      setError(message(e));
+    } finally {
+      setBusy(false);
+    }
+  }, [busy, onLogin]);
   return (
     <div className="auth">
       <div className="auth-story">
@@ -91,6 +191,7 @@ export default function Auth({ onLogin }: { onLogin: (user: User) => void }) {
             <ArrowRight size={17} />
           </button>
         </form>
+        <GoogleSignIn busy={busy} onCredential={googleLogin} />
         <p className="auth-switch">
           {register ? "Already have an account?" : "New to PaperFlow?"}{" "}
           <button

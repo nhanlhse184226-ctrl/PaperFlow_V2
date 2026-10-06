@@ -4,7 +4,8 @@
         android:label="PaperFlow"
         android:allowBackup="false"
         android:name="${applicationName}"
-        android:icon="@mipmap/ic_launcher">
+        android:icon="@drawable/paperflow_launcher"
+        android:roundIcon="@drawable/paperflow_launcher">
         <activity
             android:name=".MainActivity"
             android:exported="true"

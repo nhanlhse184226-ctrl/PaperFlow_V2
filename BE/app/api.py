@@ -14,6 +14,10 @@ class Credentials(Model):
     password: str = Field(min_length=3, max_length=128)
 
 
+class GoogleCredential(Model):
+    credential: str = Field(min_length=20, max_length=10000)
+
+
 class Name(Model):
     name: str = Field(min_length=3, max_length=200)
 
@@ -88,7 +92,7 @@ def create_router(service, auth, settings, billing=None, feedback=None):
             "ai_configured": settings.ai_provider == "ollama" or bool(settings.gemini_api_key),
         }
 
-    def establish(credentials, request, response, register):
+    def allow_sign_in_attempt(request):
         address = request.client.host if request.client else "unknown"
         with guard:
             cutoff = time.monotonic() - 300
@@ -100,7 +104,8 @@ def create_router(service, auth, settings, billing=None, feedback=None):
             if len(attempts[address]) >= 20:
                 raise AppError("Too many sign-in attempts. Wait five minutes.", 429)
             attempts[address].append(time.monotonic())
-        token, current = auth.login(credentials.email, credentials.password, register)
+
+    def establish_session(token, current, response):
         response.set_cookie(
             "paperflow_session",
             token,
@@ -112,6 +117,11 @@ def create_router(service, auth, settings, billing=None, feedback=None):
         )
         return current
 
+    def establish(credentials, request, response, register):
+        allow_sign_in_attempt(request)
+        token, current = auth.login(credentials.email, credentials.password, register)
+        return establish_session(token, current, response)
+
     @router.post("/auth/register", status_code=201)
     def register(body: Credentials, request: Request, response: Response):
         return establish(body, request, response, True)
@@ -119,6 +129,17 @@ def create_router(service, auth, settings, billing=None, feedback=None):
     @router.post("/auth/login")
     def login(body: Credentials, request: Request, response: Response):
         return establish(body, request, response, False)
+
+    @router.get("/auth/google/config")
+    def google_config():
+        client_id = settings.google_oauth_client_id.strip()
+        return {"enabled": bool(client_id), "client_id": client_id}
+
+    @router.post("/auth/google")
+    def google_login(body: GoogleCredential, request: Request, response: Response):
+        allow_sign_in_attempt(request)
+        token, current = auth.login_google(body.credential)
+        return establish_session(token, current, response)
 
     @router.get("/auth/me")
     def me(current=Depends(user)):

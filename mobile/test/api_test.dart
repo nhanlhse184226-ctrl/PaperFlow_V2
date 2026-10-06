@@ -103,6 +103,32 @@ void main() {
     expect(storage.value, isNull);
     expect(expired, isTrue);
   });
+  test('Google login uses the same secure PaperFlow session', () async {
+    final storage = MemoryStore();
+    final dio = Dio()
+      ..httpClientAdapter = ReplyAdapter((o) {
+        if (o.path == '/auth/google') {
+          expect(o.data['credential'], 'google-id-token');
+          return jsonReply(
+            {'email': 'member@example.com'},
+            headers: {
+              'set-cookie': [
+                'paperflow_session=google-session; Max-Age=604800; Path=/; Secure; HttpOnly; SameSite=None',
+              ],
+            },
+          );
+        }
+        expect(o.path, '/auth/me');
+        expect(o.headers['cookie'], 'paperflow_session=google-session');
+        return jsonReply({'id': 'user', 'email': 'member@example.com'});
+      });
+    final user = await PaperApi(
+      store: storage,
+      client: dio,
+    ).signInWithGoogle('google-id-token');
+    expect(user['id'], 'user');
+    expect(jsonDecode(storage.value!)['token'], 'google-session');
+  });
   test('expired local sessions are never sent', () async {
     final storage = MemoryStore()
       ..value = jsonEncode({'token': 'old', 'expires': '2000-01-01T00:00:00Z'});

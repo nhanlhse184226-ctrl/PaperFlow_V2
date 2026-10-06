@@ -18,6 +18,7 @@ services:
       PAYOS_CHECKSUM_KEY: ${PAYOS_CHECKSUM_KEY:-}
       PAYOS_RETURN_URL: ${PAYOS_RETURN_URL:-http://localhost:8080/billing/result}
       PAYOS_CANCEL_URL: ${PAYOS_CANCEL_URL:-http://localhost:8080/billing/result}
+      GOOGLE_OAUTH_CLIENT_ID: ${GOOGLE_OAUTH_CLIENT_ID:-}
     volumes:
       - paperflow-data:/data
     healthcheck:

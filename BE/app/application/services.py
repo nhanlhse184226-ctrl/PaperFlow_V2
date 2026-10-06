@@ -30,9 +30,10 @@ def invalidate_reports(project):
 
 
 class AuthService:
-    def __init__(self, repo: Repository, initial_admin_email: str = ""):
+    def __init__(self, repo: Repository, initial_admin_email: str = "", google_identity=None):
         self.repo = repo
         self.initial_admin_email = initial_admin_email.strip().lower()
+        self.google_identity = google_identity
 
     def role_for(self, email):
         return "ADMIN" if email == self.initial_admin_email else "USER"
@@ -54,6 +55,12 @@ class AuthService:
             return
         self.repo.register(email, self.password_hash(password), "ADMIN")
 
+    def issue_session(self, user_id, email):
+        token = secrets.token_urlsafe(32)
+        self.repo.session(hashlib.sha256(token.encode()).hexdigest(), user_id, time.time() + 604800)
+        current = self.repo.user(email) or {"role": self.role_for(email)}
+        return token, {"id": user_id, "email": email, "role": current.get("role", "USER")}
+
     def login(self, email, password, register=False):
         email = email.strip().lower()
         if not re.fullmatch(r"[^\s@]+@[^\s@]+\.[^\s@]+", email) or len(email) > 254:
@@ -72,10 +79,24 @@ class AuthService:
             user_id = user["id"]
             if self.role_for(email) == "ADMIN":
                 self.repo.set_role(email, "ADMIN")
-        token = secrets.token_urlsafe(32)
-        self.repo.session(hashlib.sha256(token.encode()).hexdigest(), user_id, time.time() + 604800)
-        current = self.repo.user(email) or {"role": self.role_for(email)}
-        return token, {"id": user_id, "email": email, "role": current.get("role", "USER")}
+        return self.issue_session(user_id, email)
+
+    def login_google(self, credential):
+        if self.google_identity is None:
+            raise AppError("Google sign-in is not configured.", 503)
+        email = self.google_identity.verify(credential)
+        user = self.repo.user(email)
+        if user:
+            user_id = user["id"]
+        else:
+            # A random unusable password preserves the existing user schema while
+            # ensuring Google identities are never authenticated by a client-supplied password.
+            user_id = self.repo.register(
+                email, self.password_hash(secrets.token_urlsafe(48)), self.role_for(email)
+            )
+        if self.role_for(email) == "ADMIN":
+            self.repo.set_role(email, "ADMIN")
+        return self.issue_session(user_id, email)
 
     def authenticate(self, token):
         user = self.repo.authenticate(hashlib.sha256(token.encode()).hexdigest()) if token else None

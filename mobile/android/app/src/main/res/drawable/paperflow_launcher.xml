@@ -1,0 +1,43 @@
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <!-- Matches the frontend Brand mark: a gently rotated forest-green tile
+         containing the Lucide Layers3 glyph. -->
+    <group
+        android:pivotX="54"
+        android:pivotY="54"
+        android:rotation="-5">
+        <path
+            android:fillColor="#1F5C49"
+            android:pathData="M26,10L82,10C88.6,10 94,15.4 94,22L94,86C94,92.6 88.6,98 82,98L26,98C19.4,98 14,92.6 14,86L14,22C14,15.4 19.4,10 26,10Z" />
+        <group
+            android:translateX="18"
+            android:translateY="18"
+            android:scaleX="3"
+            android:scaleY="3">
+            <path
+                android:fillColor="@android:color/transparent"
+                android:pathData="M12.83,2.18A2,2 0,0 0,11.17,2.18L2.6,6.08A1,1 0,0 0,2.6,7.91L11.17,11.82A2,2 0,0 0,12.83,11.82L21.4,7.92A1,1 0,0 0,21.4,6.08Z"
+                android:strokeColor="#FFFFFF"
+                android:strokeLineCap="round"
+                android:strokeLineJoin="round"
+                android:strokeWidth="1.8" />
+            <path
+                android:fillColor="@android:color/transparent"
+                android:pathData="M22,12.5L12.83,16.68A2,2 0,0 1,11.17,16.68L2,12.5"
+                android:strokeColor="#FFFFFF"
+                android:strokeLineCap="round"
+                android:strokeLineJoin="round"
+                android:strokeWidth="1.8" />
+            <path
+                android:fillColor="@android:color/transparent"
+                android:pathData="M22,17.5L12.83,21.68A2,2 0,0 1,11.17,21.68L2,17.5"
+                android:strokeColor="#FFFFFF"
+                android:strokeLineCap="round"
+                android:strokeLineJoin="round"
+                android:strokeWidth="1.8" />
+        </group>
+    </group>
+</vector>

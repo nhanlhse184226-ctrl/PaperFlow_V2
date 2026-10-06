@@ -14,5 +14,7 @@ services:
         value: none
       - key: SUPABASE_BUCKET
         value: paperflow
+      # Set GOOGLE_OAUTH_CLIENT_ID in the Render dashboard. The client secret
+      # is not used by PaperFlow's ID-token sign-in flow.
       # Set the remaining values as secrets in the Render dashboard. They are
       # intentionally not included in source control.
