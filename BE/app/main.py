@@ -12,6 +12,7 @@ from starlette.middleware.trustedhost import TrustedHostMiddleware
 from app.api import create_router
 from app.application.models import AppError
 from app.application.billing import BillingService
+from app.application.feedback import FeedbackService
 from app.application.services import AuthService, WorkspaceService
 from app.infrastructure.files import LocalStorage, PypdfExtractor
 from app.infrastructure.gemini import GeminiAiProvider
@@ -103,6 +104,7 @@ def create_app(settings=None, ai=None, pdf=None, payment_gateway=None):
         settings.payos_return_url,
         settings.payos_cancel_url,
     )
+    app.state.feedback = FeedbackService(repo)
     app.add_middleware(TrustedHostMiddleware, allowed_hosts=settings.allowed_hosts.split(","))
     origins = set(settings.allowed_origins.split(","))
     app.add_middleware(
@@ -151,7 +153,7 @@ def create_app(settings=None, ai=None, pdf=None, payment_gateway=None):
             {"message": "The request could not be completed. Your saved work is safe."}, status_code=500
         )
 
-    app.include_router(create_router(service, auth, settings, app.state.billing))
+    app.include_router(create_router(service, auth, settings, app.state.billing, app.state.feedback))
     return app
 
 

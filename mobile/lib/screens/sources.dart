@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 import '../data/api.dart';
 import '../data/workspace.dart';
 import '../ui/design.dart';
+import '../ui/feedback.dart';
 import 'evidence.dart';
 
 Future<void> pickUpload(Workspace w, {bool draft = false}) async {
@@ -285,6 +286,7 @@ class SourceDetails extends StatelessWidget {
                 ...strings(evaluation['warnings']),
               ])
                 ErrorNotice(warning),
+              AiFeedback(work: work, module: 'source_evaluation', resultId: textOf(source, 'id')),
             ],
           ],
         ),

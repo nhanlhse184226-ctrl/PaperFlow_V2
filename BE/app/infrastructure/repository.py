@@ -283,3 +283,56 @@ class SqliteRepository:
             trend = [dict(row) for row in db.execute("SELECT substr(COALESCE(paid_at,created_at),1,10) AS day, COALESCE(SUM(CASE WHEN status='PAID' THEN amount ELSE 0 END),0) AS revenue, COUNT(CASE WHEN status='PAID' THEN 1 END) AS orders FROM billing_orders GROUP BY day ORDER BY day DESC LIMIT 7").fetchall()][::-1]
             recent = [dict(row) for row in db.execute("SELECT billing_orders.*, users.email FROM billing_orders JOIN users ON users.id=billing_orders.user_id ORDER BY created_at DESC LIMIT 10").fetchall()]
             return {"revenue": total["revenue"], "paid_orders": total["orders"], "customers": total["customers"], "pending_orders": pending["count"], "trend": trend, "recent_orders": recent}
+
+    @staticmethod
+    def _feedback(row):
+        item = dict(row)
+        item["helpful"] = None if item["helpful"] is None else bool(item["helpful"])
+        item["metadata"] = json.loads(item["metadata"] or "{}")
+        return item
+
+    def create_feedback(self, item):
+        stored = {**item, "metadata": json.dumps(item["metadata"], separators=(",", ":"))}
+        with self.connect() as db:
+            db.execute("""INSERT INTO feedback_items
+                (id,user_id,kind,module,result_id,project_id,helpful,reason,product_type,comment,metadata,status,created_at,updated_at)
+                VALUES (:id,:user_id,:kind,:module,:result_id,:project_id,:helpful,:reason,:product_type,:comment,:metadata,:status,:created_at,:updated_at)""", stored)
+        return {**item, "metadata": item["metadata"]}
+
+    def upsert_ai_feedback(self, item):
+        with self.connect() as db:
+            existing = db.execute("SELECT id FROM feedback_items WHERE user_id=? AND module=? AND result_id=? AND kind='AI'", (item["user_id"], item["module"], item["result_id"])).fetchone()
+            if existing:
+                item["id"] = existing["id"]
+                db.execute("""UPDATE feedback_items SET helpful=:helpful,reason=:reason,comment=:comment,status='NEW',updated_at=:updated_at
+                    WHERE id=:id""", item)
+        if not existing:
+            return self.create_feedback(item)
+        return {**item, "metadata": {}}
+
+    def feedback_summary(self):
+        with self.connect() as db:
+            rows = db.execute("SELECT module, COUNT(*) AS total, SUM(CASE WHEN helpful=1 THEN 1 ELSE 0 END) AS positive FROM feedback_items WHERE kind='AI' GROUP BY module").fetchall()
+            total = sum(row["total"] for row in rows)
+            positive = sum(row["positive"] or 0 for row in rows)
+            return {"total": total, "positive": positive, "helpful_rate": round(positive * 100 / total) if total else None, "by_module": [{"module": row["module"], "total": row["total"], "positive": row["positive"] or 0, "helpful_rate": round((row["positive"] or 0) * 100 / row["total"])} for row in rows]}
+
+    def feedback_list(self, category, status=None):
+        clauses, values = [], []
+        if category == "negative": clauses.append("f.kind='AI' AND f.helpful=0")
+        if category == "bug": clauses.append("f.kind='PRODUCT' AND f.product_type='BUG'")
+        if category == "suggestion": clauses.append("f.kind='PRODUCT' AND f.product_type='SUGGESTION'")
+        if status: clauses.append("f.status=?"); values.append(status)
+        where = " WHERE " + " AND ".join(clauses) if clauses else ""
+        with self.connect() as db:
+            rows = db.execute("SELECT f.*,u.email AS user_email FROM feedback_items f JOIN users u ON u.id=f.user_id" + where + " ORDER BY f.created_at DESC LIMIT 200", values).fetchall()
+            return [self._feedback(row) for row in rows]
+
+    def feedback_item(self, feedback_id):
+        with self.connect() as db:
+            row = db.execute("SELECT f.*,u.email AS user_email FROM feedback_items f JOIN users u ON u.id=f.user_id WHERE f.id=?", (feedback_id,)).fetchone()
+            return self._feedback(row) if row else None
+
+    def update_feedback_status(self, feedback_id, status, updated_at):
+        with self.connect() as db:
+            return db.execute("UPDATE feedback_items SET status=?,updated_at=? WHERE id=?", (status, updated_at, feedback_id)).rowcount

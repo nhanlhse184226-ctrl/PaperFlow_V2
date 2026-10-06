@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../data/api.dart';
 import '../data/workspace.dart';
 import '../ui/design.dart';
+import '../ui/feedback.dart';
 
 class TopicTab extends StatefulWidget {
   const TopicTab({super.key, required this.work});
@@ -193,6 +194,7 @@ class _TopicTabState extends State<TopicTab> {
               w.confirmed ? 'Đề tài đã xác nhận' : 'Xác nhận hướng nghiên cứu',
             ),
           ),
+          AiFeedback(work: w, module: 'topic_analysis', resultId: w.id),
         ],
         const SizedBox(height: 24),
       ],

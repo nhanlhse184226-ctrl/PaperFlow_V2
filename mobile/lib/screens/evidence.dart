@@ -8,6 +8,7 @@ import 'package:share_plus/share_plus.dart';
 import '../data/api.dart';
 import '../data/workspace.dart';
 import '../ui/design.dart';
+import '../ui/feedback.dart';
 
 void openPdf(BuildContext context, Workspace work, String sourceId, int page) {
   Navigator.push(
@@ -248,6 +249,8 @@ class _EvidenceTabState extends State<EvidenceTab> {
             ),
           ),
         ),
+        if (objects(w.project!['comparisons']).isNotEmpty)
+          AiFeedback(work: w, module: 'compare_sources', resultId: w.id),
         const SizedBox(height: 24),
       ],
     );

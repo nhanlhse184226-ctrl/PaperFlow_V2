@@ -13,6 +13,7 @@ import {
 import { api } from "../../api";
 import { Badge, Empty, Notice, Modal, readable } from "../../ui";
 import type { Claim, Draft, WorkspaceProps } from "../../types";
+import AiFeedback from "../../components/AiFeedback";
 export default function Essay({ p, run, busy, base, inspect }: WorkspaceProps) {
   const [did, setDid] = useState(p.drafts[0]?.id || ""),
     [title, setTitle] = useState(""),
@@ -248,6 +249,7 @@ export default function Essay({ p, run, busy, base, inspect }: WorkspaceProps) {
                   </button>
                 ))}
               </div>
+              <AiFeedback module="essay_evidence_check" projectId={p.id} resultId={draft.id} />
             </>
           ) : (
             <Empty

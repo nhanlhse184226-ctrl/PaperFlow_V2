@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../data/api.dart';
 import '../data/workspace.dart';
 import '../ui/design.dart';
+import '../ui/feedback.dart';
 import 'sources.dart';
 import 'evidence.dart';
 
@@ -235,6 +236,8 @@ class _EssayTabState extends State<EssayTab> {
                   ),
                 ),
               ),
+          if (claims.isNotEmpty)
+            AiFeedback(work: w, module: 'essay_evidence_check', resultId: textOf(d, 'id')),
         ],
         const SizedBox(height: 24),
       ],

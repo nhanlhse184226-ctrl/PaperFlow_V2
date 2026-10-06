@@ -12,6 +12,7 @@ import {
 import { api } from "../../api";
 import { Badge, Empty } from "../../ui";
 import type { WorkspaceProps } from "../../types";
+import AiFeedback from "../../components/AiFeedback";
 export default function Matrix({
   p,
   run,
@@ -248,6 +249,7 @@ export default function Matrix({
               </div>
             </div>
           ))}
+          <AiFeedback module="compare_sources" projectId={p.id} resultId={p.id} />
         </section>
       )}
     </>

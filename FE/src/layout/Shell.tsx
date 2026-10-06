@@ -8,6 +8,7 @@ import {
   LogOut,
   Menu,
   CreditCard,
+  CircleHelp,
   Shield,
   Users,
 } from "lucide-react";
@@ -18,6 +19,8 @@ import Hub from "../pages/Hub";
 import Workspace from "../pages/Workspace";
 import Billing from "../pages/Billing";
 import Admin from "../pages/Admin";
+import Feedback from "../pages/Feedback";
+import AdminFeedback from "../pages/AdminFeedback";
 import { LanguageToggle, useLanguage } from "../i18n";
 export default function Shell({
   user,
@@ -98,6 +101,10 @@ export default function Shell({
             <CreditCard size={18} />
             Plans & billing
           </NavLink>
+          <NavLink to="/feedback">
+            <CircleHelp size={18} />
+            Help & Feedback
+          </NavLink>
           {user.role === "ADMIN" && (
             <NavLink to="/admin">
               <Shield size={18} />
@@ -162,8 +169,12 @@ export default function Shell({
             <Route path="/hub" element={<Hub />} />
             <Route path="/billing" element={<Billing />} />
             <Route path="/billing/result" element={<Billing />} />
+            <Route path="/feedback" element={<Feedback />} />
             {user.role === "ADMIN" && (
-              <Route path="/admin" element={<Admin logout={logout} />} />
+              <>
+                <Route path="/admin" element={<Admin logout={logout} />} />
+                <Route path="/admin/feedback" element={<AdminFeedback />} />
+              </>
             )}
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>

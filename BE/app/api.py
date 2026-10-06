@@ -45,7 +45,26 @@ class CheckoutInput(Model):
     plan_id: Literal["starter", "research", "pro"]
 
 
-def create_router(service, auth, settings, billing=None):
+class AiFeedbackInput(Model):
+    module: Literal["topic_analysis", "source_evaluation", "compare_sources", "essay_evidence_check"]
+    project_id: str = Field(min_length=1, max_length=100)
+    result_id: str = Field(min_length=1, max_length=100)
+    helpful: bool
+    reason: Literal["INCORRECT", "MISSING_INFORMATION", "CITATION_EVIDENCE", "TOO_VERBOSE", "OTHER"] | None = None
+    comment: str = Field(default="", max_length=1000)
+
+
+class ProductFeedbackInput(Model):
+    type: Literal["BUG", "SUGGESTION", "OTHER"]
+    comment: str = Field(min_length=3, max_length=3000)
+    metadata: dict[str, str] = Field(default_factory=dict, max_length=3)
+
+
+class FeedbackStatusInput(Model):
+    status: Literal["NEW", "REVIEWED", "RESOLVED"]
+
+
+def create_router(service, auth, settings, billing=None, feedback=None):
     router = APIRouter(prefix="/api")
     attempts = defaultdict(deque)
     guard = Lock()
@@ -139,6 +158,26 @@ def create_router(service, auth, settings, billing=None):
     @router.get("/admin/overview")
     def admin_overview(current=Depends(admin)):
         return billing.overview()
+
+    @router.post("/feedback/ai", status_code=201)
+    def ai_feedback(body: AiFeedbackInput, current=Depends(user)):
+        return feedback.submit_ai(current["id"], body.module, body.project_id, body.result_id, body.helpful, body.reason, body.comment)
+
+    @router.post("/feedback", status_code=201)
+    def product_feedback(body: ProductFeedbackInput, current=Depends(user)):
+        return feedback.submit_product(current["id"], body.type, body.comment, body.metadata)
+
+    @router.get("/admin/feedback")
+    def admin_feedback(category: Literal["all", "negative", "bug", "suggestion"] = "all", status: Literal["NEW", "REVIEWED", "RESOLVED"] | None = None, current=Depends(admin)):
+        return {"summary": feedback.summary(), "items": feedback.list(category, status)}
+
+    @router.get("/admin/feedback/{feedback_id}")
+    def admin_feedback_detail(feedback_id: str, current=Depends(admin)):
+        return feedback.detail(feedback_id)
+
+    @router.patch("/admin/feedback/{feedback_id}")
+    def admin_feedback_status(feedback_id: str, body: FeedbackStatusInput, current=Depends(admin)):
+        return feedback.set_status(feedback_id, body.status)
 
     @router.get("/projects")
     def projects(oid=Depends(owner)):

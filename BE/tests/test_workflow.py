@@ -115,7 +115,7 @@ def test_complete_workflow_and_persistence(setup):
     assert p.drafts[0].claims[0].check.matches[0].evidence_id in {e.id for s in p.sources for e in s.evidence}
     with sqlite3.connect(app.state.repo.path) as db:
         assert db.execute("PRAGMA foreign_key_check").fetchall() == []
-        assert db.execute("SELECT COUNT(*) FROM migrations").fetchone()[0] == 5
+        assert db.execute("SELECT COUNT(*) FROM migrations").fetchone()[0] == 6
     assert client.delete(base + f"/sources/{first}").status_code == 200
     p = client.get(base).json()
     assert p["comparisons"] == []

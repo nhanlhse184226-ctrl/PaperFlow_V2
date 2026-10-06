@@ -11,6 +11,7 @@ import {
 import { api, apiUrl } from "../../api";
 import { Badge, Empty, Notice, TextList, Modal } from "../../ui";
 import type { Source, WorkspaceProps } from "../../types";
+import AiFeedback from "../../components/AiFeedback";
 export default function Sources({
   p,
   run,
@@ -226,6 +227,7 @@ export default function Sources({
                 title="Evaluation warnings"
                 items={detail.evaluation.warnings}
               />
+              <AiFeedback module="source_evaluation" projectId={p.id} resultId={detail.id} />
             </>
           ) : (
             <Empty title="Not evaluated yet">

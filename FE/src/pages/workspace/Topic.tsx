@@ -3,6 +3,7 @@ import { ArrowRight, Check, Compass, Sparkles } from "lucide-react";
 import { api } from "../../api";
 import { Badge, Empty, TextList, Notice, message } from "../../ui";
 import { useLanguage } from "../../i18n";
+import AiFeedback from "../../components/AiFeedback";
 import type { Analysis, Context, WorkspaceProps } from "../../types";
 const pendingTranslations = new Map<string, Promise<Analysis>>();
 export default function Topic({ p, run, busy, base }: WorkspaceProps) {
@@ -260,6 +261,7 @@ export default function Topic({ p, run, busy, base }: WorkspaceProps) {
                   : "Confirm this direction"}
               </button>
             </div>
+            <AiFeedback module="topic_analysis" projectId={p.id} resultId={p.id} />
           </>
         ) : (
           <Empty

@@ -5,7 +5,9 @@ import {
   LogOut,
   ReceiptText,
   UsersRound,
+  MessageSquareText,
 } from "lucide-react";
+import { Link } from "react-router-dom";
 import { api } from "../api";
 import { Notice, message } from "../ui";
 type Trend = { day: string; revenue: number; orders: number };
@@ -68,6 +70,7 @@ export default function Admin({ logout }: { logout: () => Promise<void> }) {
           <p>Chỉ tính đơn PayOS đã xác nhận.</p>
         </div>
         <div className="admin-heading-actions">
+          <Link className="admin-logout" to="/admin/feedback"><MessageSquareText size={16} /> Feedback</Link>
           <span className="live-badge">DỮ LIỆU THỜI GIAN THỰC</span>
           <button
             className="admin-logout"
