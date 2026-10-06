@@ -319,10 +319,15 @@ class SqliteRepository:
 
     def feedback_list(self, category, status=None):
         clauses, values = [], []
-        if category == "negative": clauses.append("f.kind='AI' AND f.helpful=0")
-        if category == "bug": clauses.append("f.kind='PRODUCT' AND f.product_type='BUG'")
-        if category == "suggestion": clauses.append("f.kind='PRODUCT' AND f.product_type='SUGGESTION'")
-        if status: clauses.append("f.status=?"); values.append(status)
+        if category == "negative":
+            clauses.append("f.kind='AI' AND f.helpful=0")
+        if category == "bug":
+            clauses.append("f.kind='PRODUCT' AND f.product_type='BUG'")
+        if category == "suggestion":
+            clauses.append("f.kind='PRODUCT' AND f.product_type='SUGGESTION'")
+        if status:
+            clauses.append("f.status=?")
+            values.append(status)
         where = " WHERE " + " AND ".join(clauses) if clauses else ""
         with self.connect() as db:
             rows = db.execute("SELECT f.*,u.email AS user_email FROM feedback_items f JOIN users u ON u.id=f.user_id" + where + " ORDER BY f.created_at DESC LIMIT 200", values).fetchall()
