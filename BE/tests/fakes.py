@@ -69,7 +69,13 @@ class FakeAi:
     def translate_matrix(self, items, language):
         self.calls.append("matrix_translation")
         return MatrixTranslations(
-            items=[TranslationText(key=item.key, text=f"{language}: {item.text}") for item in items]
+            items=[
+                TranslationText(
+                    key=item.key,
+                    text=item.text if language == "en" else f"{language}: {item.text}",
+                )
+                for item in items
+            ]
         )
 
     def evaluate_source(self, context, pages):
