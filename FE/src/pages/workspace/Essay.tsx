@@ -1,4 +1,4 @@
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   ArrowRight,
   Check,
@@ -15,17 +15,68 @@ import { useLanguage } from "../../i18n";
 import { Badge, Empty, Notice, Modal, readable } from "../../ui";
 import type { Claim, Draft, WorkspaceProps } from "../../types";
 import AiFeedback from "../../components/AiFeedback";
+
+type ClaimReviewTranslation = {
+  explanation: string;
+  relevance: string;
+  citation_issue: string;
+  limitation: string;
+  action: string;
+  matches: string[];
+};
+
 export default function Essay({ p, run, busy, base, inspect }: WorkspaceProps) {
   const [did, setDid] = useState(p.drafts[0]?.id || ""),
     [title, setTitle] = useState(""),
     [text, setText] = useState(""),
     [editing, setEditing] = useState(!p.drafts.length),
-    [claim, setClaim] = useState<Claim | null>(null);
+    [claim, setClaim] = useState<Claim | null>(null),
+    [claimTranslation, setClaimTranslation] = useState<{
+      claimId: string;
+      value: ClaimReviewTranslation;
+    } | null>(null);
   const upload = useRef<HTMLInputElement>(null);
-  const composingDraft = useRef(false);
   const language = useLanguage();
   const draft = p.drafts.find((d) => d.id === did) || p.drafts[0];
   const activeClaim = draft?.claims.find((c) => c.id === claim?.id);
+  const claimTranslationKey = activeClaim?.check
+    ? JSON.stringify(activeClaim.check)
+    : "";
+  const reviewTranslation =
+    claimTranslation && claimTranslation.claimId === activeClaim?.id
+      ? claimTranslation.value
+      : null;
+  useEffect(() => {
+    let current = true;
+    if (!draft || !activeClaim?.check || language === p.context.output_language) {
+      setClaimTranslation(null);
+      return () => {
+        current = false;
+      };
+    }
+    setClaimTranslation(null);
+    void api<ClaimReviewTranslation>(
+      `${base}/drafts/${draft.id}/claims/${activeClaim.id}/translation`,
+      "POST",
+      { language },
+    )
+      .then((value) => {
+        if (current) setClaimTranslation({ claimId: activeClaim.id, value });
+      })
+      .catch(() => {
+        if (current) setClaimTranslation(null);
+      });
+    return () => {
+      current = false;
+    };
+  }, [
+    activeClaim?.id,
+    base,
+    claimTranslationKey,
+    draft?.id,
+    language,
+    p.context.output_language,
+  ]);
   function edit(d?: Draft) {
     setDid(d?.id || "");
     setTitle((d?.title || "").normalize("NFC"));
@@ -134,7 +185,7 @@ export default function Essay({ p, run, busy, base, inspect }: WorkspaceProps) {
                   minLength={1}
                   maxLength={200}
                   value={title}
-                  onChange={(e) => setTitle(e.target.value.normalize("NFC"))}
+                  onChange={(e) => setTitle(e.target.value)}
                   placeholder="e.g. Literature review · first draft"
                 />
               </label>
@@ -147,21 +198,11 @@ export default function Essay({ p, run, busy, base, inspect }: WorkspaceProps) {
                   maxLength={60000}
                   value={text}
                   lang={language === "vi" ? "vi" : "en"}
-                  spellCheck
-                  onCompositionStart={() => {
-                    composingDraft.current = true;
-                  }}
-                  onCompositionEnd={(e) => {
-                    composingDraft.current = false;
+                  spellCheck={false}
+                  onBlur={(e) => {
                     setText(e.currentTarget.value.normalize("NFC"));
                   }}
-                  onChange={(e) =>
-                    setText(
-                      composingDraft.current
-                        ? e.target.value
-                        : e.target.value.normalize("NFC"),
-                    )
-                  }
+                  onChange={(e) => setText(e.target.value)}
                   placeholder="Paste your writing here, including any in-text citations…"
                 />
               </label>
@@ -311,27 +352,27 @@ export default function Essay({ p, run, busy, base, inspect }: WorkspaceProps) {
               >
                 {readable(activeClaim.check.status)}
               </Badge>
-              <p>{activeClaim.check.explanation}</p>
+              <p>{reviewTranslation?.explanation || activeClaim.check.explanation}</p>
               <div className="evaluation-block">
                 <h4>Topic relevance</h4>
-                <p>{activeClaim.check.relevance}</p>
+                <p>{reviewTranslation?.relevance || activeClaim.check.relevance}</p>
                 <h4>Citation coverage</h4>
-                <p>{activeClaim.check.citation_issue}</p>
+                <p>{reviewTranslation?.citation_issue || activeClaim.check.citation_issue}</p>
                 <h4>Evidence limitations</h4>
-                <p>{activeClaim.check.limitation}</p>
+                <p>{reviewTranslation?.limitation || activeClaim.check.limitation}</p>
                 <h4>Recommended action</h4>
-                <p>{activeClaim.check.action}</p>
+                <p>{reviewTranslation?.action || activeClaim.check.action}</p>
               </div>
               <h3 className="subheading">Evidence connections</h3>
               {activeClaim.check.matches.length ? (
-                activeClaim.check.matches.map((m) => {
+                activeClaim.check.matches.map((m, index) => {
                   const e = p.sources
                     .flatMap((s) => s.evidence)
                     .find((e) => e.id === m.evidence_id);
                   return e ? (
                     <div className="match" key={m.evidence_id}>
                       <Badge>{m.relation}</Badge>
-                      <p>{m.explanation}</p>
+                      <p>{reviewTranslation?.matches[index] || m.explanation}</p>
                       <blockquote>{e.quote}</blockquote>
                       <button
                         className="text-button"

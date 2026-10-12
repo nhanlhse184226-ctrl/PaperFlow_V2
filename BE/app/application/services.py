@@ -376,6 +376,36 @@ class WorkspaceService:
             "comparisons": [values[f"c:{index}"] for index in range(len(p.comparisons))],
         }
 
+    def translated_claim_check(self, owner, pid, draft_id, claim_id, language):
+        p = self.repo.get(owner, pid)
+        draft = next((item for item in p.drafts if item.id == draft_id), None)
+        if not draft:
+            raise AppError("Draft not found.", 404)
+        claim = next((item for item in draft.claims if item.id == claim_id), None)
+        if not claim or not claim.check:
+            raise AppError("Claim check is no longer available. Refresh and retry.", 409)
+        check = claim.check
+        fields = {
+            "explanation": check.explanation,
+            "relevance": check.relevance,
+            "citation_issue": check.citation_issue,
+            "limitation": check.limitation,
+            "action": check.action,
+        }
+        texts = [TranslationText(key=key, text=value) for key, value in fields.items()]
+        texts.extend(
+            TranslationText(key=f"match:{index}", text=item.explanation)
+            for index, item in enumerate(check.matches)
+        )
+        translated = texts if language == p.context.output_language else self.ai.translate_matrix(texts, language).items
+        if [item.key for item in translated] != [item.key for item in texts]:
+            raise AppError("Translation changed the claim review structure. Retry.", 502)
+        values = {item.key: item.text for item in translated}
+        return {
+            **{key: values[key] for key in fields},
+            "matches": [values[f"match:{index}"] for index in range(len(check.matches))],
+        }
+
     def compare(self, owner, pid, source_ids, force=False):
         with self.editing(owner, pid, "Comparing evidence") as p:
             if not p.confirmed:

@@ -140,6 +140,24 @@ def test_matrix_translation_keeps_source_evidence_and_comparison_structure(setup
     assert ai.calls.count("matrix_translation") == 1
 
 
+def test_claim_review_translation_keeps_saved_check_unchanged(setup):
+    client, ai, _ = setup
+    base = project(client)
+    source(client, base)
+    draft_id = client.post(base + "/drafts", json={"title": "Draft", "text": CLAIM}).json()["id"]
+    assert client.post(base + f"/drafts/{draft_id}/check", json={}).status_code == 200
+    original = client.get(base).json()
+    claim = original["drafts"][0]["claims"][0]
+    translated = client.post(
+        base + f"/drafts/{draft_id}/claims/{claim['id']}/translation", json={"language": "vi"}
+    )
+    assert translated.status_code == 200
+    assert translated.json()["explanation"].startswith("vi:")
+    assert translated.json()["matches"][0].startswith("vi:")
+    assert client.get(base).json() == original
+    assert ai.calls.count("matrix_translation") == 1
+
+
 @pytest.mark.parametrize(
     "mode,status",
     [

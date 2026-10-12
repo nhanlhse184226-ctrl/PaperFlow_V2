@@ -222,6 +222,7 @@ const vietnamese: Record<string, string> = {
   "Edit draft": "Sửa bài nháp",
   "Check evidence": "Kiểm tra bằng chứng",
   "Run a new check": "Chạy kiểm tra mới",
+  "Claim evidence review": "Đánh giá bằng chứng cho luận điểm",
   "Topic relevance": "Mức độ liên quan đến chủ đề",
   "Citation coverage": "Mức độ bao phủ trích dẫn",
   "Evidence limitations": "Giới hạn của bằng chứng",

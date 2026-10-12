@@ -302,6 +302,10 @@ def create_router(service, auth, settings, billing=None, feedback=None):
     def translate_matrix(pid: str, body: MatrixTranslation, oid=Depends(owner)):
         return service.translated_matrix(oid, pid, body.language, body.evidence_ids)
 
+    @router.post("/projects/{pid}/drafts/{did}/claims/{cid}/translation")
+    def translate_claim_check(pid: str, did: str, cid: str, body: Translation, oid=Depends(owner)):
+        return service.translated_claim_check(oid, pid, did, cid, body.language)
+
     @router.post("/projects/{pid}/drafts", status_code=201)
     def draft(pid: str, body: DraftInput, oid=Depends(owner)):
         return {"id": service.save_draft(oid, pid, body.title, body.text)}
