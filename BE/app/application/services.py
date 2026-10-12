@@ -5,7 +5,7 @@ import secrets
 import time
 from contextlib import contextmanager
 
-from .models import AppError, Check, Claim, Context, Draft, Evidence, Project, Source, Support
+from .models import AppError, Check, Claim, Context, Draft, Evidence, Project, Source, Support, TranslationText
 from .billing import project_limits
 from .ports import AiProvider, FileStorage, PdfExtractor, Repository
 
@@ -352,6 +352,29 @@ class WorkspaceService:
 
     def evidence(self, p):
         return [e for s in p.sources for e in s.evidence]
+
+    def translated_matrix(self, owner, pid, language, evidence_ids):
+        p = self.repo.get(owner, pid)
+        evidence_by_id = {item.id: item for item in self.evidence(p)}
+        requested_ids = list(dict.fromkeys(evidence_ids))
+        if any(item not in evidence_by_id for item in requested_ids):
+            raise AppError("Evidence selection is no longer available. Refresh and retry.", 409)
+        texts = [
+            TranslationText(key=f"e:{item}", text=evidence_by_id[item].content)
+            for item in requested_ids
+        ]
+        texts.extend(
+            TranslationText(key=f"c:{index}", text=item.explanation)
+            for index, item in enumerate(p.comparisons)
+        )
+        translated = texts if language == p.context.output_language else self.ai.translate_matrix(texts, language).items
+        if [item.key for item in translated] != [item.key for item in texts]:
+            raise AppError("Translation changed the matrix structure. Retry.", 502)
+        values = {item.key: item.text for item in translated}
+        return {
+            "evidence": {item: values[f"e:{item}"] for item in requested_ids},
+            "comparisons": [values[f"c:{index}"] for index in range(len(p.comparisons))],
+        }
 
     def compare(self, owner, pid, source_ids, force=False):
         with self.editing(owner, pid, "Comparing evidence") as p:

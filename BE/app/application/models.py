@@ -170,6 +170,15 @@ class Comparisons(Model):
     items: list[Comparison] = Field(max_length=30)
 
 
+class TranslationText(Model):
+    key: str = Field(min_length=1, max_length=120)
+    text: str = Field(min_length=1, max_length=4000)
+
+
+class MatrixTranslations(Model):
+    items: list[TranslationText] = Field(max_length=130)
+
+
 class Project(Model):
     id: str = Field(default_factory=uid)
     owner_id: str

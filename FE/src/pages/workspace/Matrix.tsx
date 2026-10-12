@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import {
   ArrowDown,
@@ -11,8 +11,15 @@ import {
 } from "lucide-react";
 import { api } from "../../api";
 import { Badge, Empty } from "../../ui";
+import { useLanguage } from "../../i18n";
 import type { WorkspaceProps } from "../../types";
 import AiFeedback from "../../components/AiFeedback";
+
+type MatrixTranslation = {
+  evidence: Record<string, string>;
+  comparisons: string[];
+};
+
 export default function Matrix({
   p,
   run,
@@ -23,6 +30,8 @@ export default function Matrix({
   const [selected, setSelected] = useState<string[]>([]),
     [kind, setKind] = useState("all"),
     [search, setSearch] = useState("");
+  const language = useLanguage();
+  const [translation, setTranslation] = useState<MatrixTranslation | null>(null);
   const evidence = p.sources.flatMap((s) => s.evidence),
     visible = evidence.filter(
       (e) =>
@@ -32,6 +41,45 @@ export default function Matrix({
           .toLowerCase()
           .includes(search.toLowerCase()),
     );
+  const translationIds = useMemo(
+    () => visible.slice(0, 100).map((item) => item.id),
+    [visible],
+  );
+  const translationIdsJson = JSON.stringify(translationIds);
+  const translationKey = [
+    language,
+    p.context.output_language,
+    translationIdsJson,
+    JSON.stringify(p.comparisons.map((item) => item.explanation)),
+  ].join("|");
+  useEffect(() => {
+    let current = true;
+    if (language === p.context.output_language) {
+      setTranslation(null);
+      return () => {
+        current = false;
+      };
+    }
+    if (!translationIds.length && !p.comparisons.length) {
+      setTranslation(null);
+      return () => {
+        current = false;
+      };
+    }
+    void api<MatrixTranslation>(base + "/matrix/translation", "POST", {
+      language,
+      evidence_ids: JSON.parse(translationIdsJson) as string[],
+    })
+      .then((result) => {
+        if (current) setTranslation(result);
+      })
+      .catch(() => {
+        if (current) setTranslation(null);
+      });
+    return () => {
+      current = false;
+    };
+  }, [base, language, p.context.output_language, translationIdsJson, translationKey]);
   function exportCsv() {
     const rows = [
       ["Source", "Type", "Interpretation", "Page", "Verified quote"],
@@ -183,7 +231,7 @@ export default function Matrix({
                       className="evidence-content"
                       onClick={() => inspect(e)}
                     >
-                      {e.content}
+                      {translation?.evidence[e.id] || e.content}
                     </button>
                     <p className="quote-preview">“{e.quote}”</p>
                   </td>
@@ -235,7 +283,7 @@ export default function Matrix({
               >
                 {c.relationship}
               </Badge>
-              <p>{c.explanation}</p>
+              <p>{translation?.comparisons[i] || c.explanation}</p>
               <div className="actions">
                 {c.evidence_ids.map((id) => {
                   const e = evidence.find((e) => e.id === id);

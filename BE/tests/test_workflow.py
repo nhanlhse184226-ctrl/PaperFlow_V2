@@ -122,6 +122,24 @@ def test_complete_workflow_and_persistence(setup):
     assert p["drafts"][0]["claims"][0]["check"] is None
 
 
+def test_matrix_translation_keeps_source_evidence_and_comparison_structure(setup):
+    client, ai, _ = setup
+    base = project(client)
+    first = source(client, base)
+    second = source(client, base, True)
+    assert client.post(base + "/comparisons", json={"source_ids": [first, second]}).status_code == 200
+    original = client.get(base).json()
+    evidence_id = original["sources"][0]["evidence"][0]["id"]
+    translated = client.post(
+        base + "/matrix/translation", json={"language": "vi", "evidence_ids": [evidence_id]}
+    )
+    assert translated.status_code == 200
+    assert translated.json()["evidence"][evidence_id].startswith("vi:")
+    assert translated.json()["comparisons"][0].startswith("vi:")
+    assert client.get(base).json() == original
+    assert ai.calls.count("matrix_translation") == 1
+
+
 @pytest.mark.parametrize(
     "mode,status",
     [

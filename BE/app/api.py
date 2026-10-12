@@ -30,6 +30,10 @@ class Translation(Model):
     language: Literal["en", "vi"]
 
 
+class MatrixTranslation(Translation):
+    evidence_ids: list[str] = Field(default_factory=list, max_length=100)
+
+
 class Selection(Run):
     source_ids: list[str] = Field(default_factory=list, max_length=30)
 
@@ -293,6 +297,10 @@ def create_router(service, auth, settings, billing=None, feedback=None):
     def compare(pid: str, body: Selection, oid=Depends(owner)):
         service.compare(oid, pid, body.source_ids, body.force)
         return {"ok": True}
+
+    @router.post("/projects/{pid}/matrix/translation")
+    def translate_matrix(pid: str, body: MatrixTranslation, oid=Depends(owner)):
+        return service.translated_matrix(oid, pid, body.language, body.evidence_ids)
 
     @router.post("/projects/{pid}/drafts", status_code=201)
     def draft(pid: str, body: DraftInput, oid=Depends(owner)):

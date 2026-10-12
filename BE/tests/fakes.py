@@ -10,7 +10,9 @@ from app.application.models import (
     EvidenceResult,
     GroundedFact,
     Match,
+    MatrixTranslations,
     TopicAnalysis,
+    TranslationText,
 )
 
 QUOTE = "Students using guided feedback improved their programming performance in the study."
@@ -62,6 +64,12 @@ class FakeAi:
             directions=["Guided feedback in introductory programming"],
             keywords=["guided feedback"],
             next_steps=["Confirm data access"],
+        )
+
+    def translate_matrix(self, items, language):
+        self.calls.append("matrix_translation")
+        return MatrixTranslations(
+            items=[TranslationText(key=item.key, text=f"{language}: {item.text}") for item in items]
         )
 
     def evaluate_source(self, context, pages):

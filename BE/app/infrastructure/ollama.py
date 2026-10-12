@@ -11,6 +11,7 @@ from app.application.models import (
     Comparisons,
     Evaluation,
     EvidenceResult,
+    MatrixTranslations,
     TopicAnalysis,
 )
 from app.infrastructure.gemini import SYSTEM, provider_schema
@@ -98,6 +99,16 @@ class OllamaAiProvider:
             "Keep dimension name and status enum values EXACTLY unchanged. Do not reassess or add facts.",
             analysis.model_dump(),
             TopicAnalysis,
+        )
+
+    def translate_matrix(self, items, language):
+        return self._run(
+            "Translate each supplied research interpretation into "
+            + ("Vietnamese" if language == "vi" else "English")
+            + ". Preserve every key EXACTLY, preserve item count and order, and do not add, omit, "
+            "reinterpret, or invent research facts. Return only the translation of each supplied text.",
+            {"items": [item.model_dump() for item in items]},
+            MatrixTranslations,
         )
 
     def evaluate_source(self, context, pages):
