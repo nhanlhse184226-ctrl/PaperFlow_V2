@@ -54,12 +54,6 @@ export default function Matrix({
   ].join("|");
   useEffect(() => {
     let current = true;
-    if (language === p.context.output_language) {
-      setTranslation(null);
-      return () => {
-        current = false;
-      };
-    }
     if (!translationIds.length && !p.comparisons.length) {
       setTranslation(null);
       return () => {

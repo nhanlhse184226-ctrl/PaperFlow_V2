@@ -367,7 +367,10 @@ class WorkspaceService:
             TranslationText(key=f"c:{index}", text=item.explanation)
             for index, item in enumerate(p.comparisons)
         )
-        translated = texts if language == p.context.output_language else self.ai.translate_matrix(texts, language).items
+        # Saved AI output can predate a language switch or be generated in a
+        # provider's default language. Translate for the active UI language
+        # instead of inferring its language from the topic configuration.
+        translated = self.ai.translate_matrix(texts, language).items
         if [item.key for item in translated] != [item.key for item in texts]:
             raise AppError("Translation changed the matrix structure. Retry.", 502)
         values = {item.key: item.text for item in translated}
@@ -397,7 +400,7 @@ class WorkspaceService:
             TranslationText(key=f"match:{index}", text=item.explanation)
             for index, item in enumerate(check.matches)
         )
-        translated = texts if language == p.context.output_language else self.ai.translate_matrix(texts, language).items
+        translated = self.ai.translate_matrix(texts, language).items
         if [item.key for item in translated] != [item.key for item in texts]:
             raise AppError("Translation changed the claim review structure. Retry.", 502)
         values = {item.key: item.text for item in translated}

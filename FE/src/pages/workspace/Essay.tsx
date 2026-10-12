@@ -48,7 +48,7 @@ export default function Essay({ p, run, busy, base, inspect }: WorkspaceProps) {
       : null;
   useEffect(() => {
     let current = true;
-    if (!draft || !activeClaim?.check || language === p.context.output_language) {
+    if (!draft || !activeClaim?.check) {
       setClaimTranslation(null);
       return () => {
         current = false;

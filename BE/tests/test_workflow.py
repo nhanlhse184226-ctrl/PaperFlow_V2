@@ -123,11 +123,14 @@ def test_complete_workflow_and_persistence(setup):
 
 
 def test_matrix_translation_keeps_source_evidence_and_comparison_structure(setup):
-    client, ai, _ = setup
+    client, ai, app = setup
     base = project(client)
     first = source(client, base)
     second = source(client, base, True)
     assert client.post(base + "/comparisons", json={"source_ids": [first, second]}).status_code == 200
+    saved = app.state.repo.get(client.get("/api/auth/me").json()["id"], base.split("/")[-1])
+    saved.context.output_language = "vi"
+    app.state.repo.save(saved)
     original = client.get(base).json()
     evidence_id = original["sources"][0]["evidence"][0]["id"]
     translated = client.post(
@@ -141,11 +144,14 @@ def test_matrix_translation_keeps_source_evidence_and_comparison_structure(setup
 
 
 def test_claim_review_translation_keeps_saved_check_unchanged(setup):
-    client, ai, _ = setup
+    client, ai, app = setup
     base = project(client)
     source(client, base)
     draft_id = client.post(base + "/drafts", json={"title": "Draft", "text": CLAIM}).json()["id"]
     assert client.post(base + f"/drafts/{draft_id}/check", json={}).status_code == 200
+    saved = app.state.repo.get(client.get("/api/auth/me").json()["id"], base.split("/")[-1])
+    saved.context.output_language = "vi"
+    app.state.repo.save(saved)
     original = client.get(base).json()
     claim = original["drafts"][0]["claims"][0]
     translated = client.post(
