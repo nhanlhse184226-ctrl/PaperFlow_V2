@@ -39,10 +39,11 @@ def ensure_account(repo, auth, email, password=None, admin=False):
     return user["id"]
 
 
-def grant_pro(repo, user_id):
-    project = next((item for item in repo.list(user_id) if item.name == DEMO_PROJECT), None)
+def grant_pro(repo, user_id, project_name=DEMO_PROJECT):
+    project_name = project_name.strip() or DEMO_PROJECT
+    project = next((item for item in repo.list(user_id) if item.name == project_name), None)
     if project is None:
-        project = Project(owner_id=user_id, name=DEMO_PROJECT, context=Context(title=DEMO_PROJECT))
+        project = Project(owner_id=user_id, name=project_name, context=Context(title=project_name))
         repo.create(project)
     if any(order["project_id"] == project.id and order["status"] == "PAID" and order["plan_id"] == "pro" for order in repo.billing_orders(user_id)):
         return project.name, False
@@ -63,14 +64,16 @@ def main():
     parser.add_argument("--user-password", required=True)
     parser.add_argument("--admin-email", required=True)
     parser.add_argument("--admin-password")
+    parser.add_argument("--admin-project-name", default=DEMO_PROJECT)
+    parser.add_argument("--user-project-name", default=DEMO_PROJECT)
     args = parser.parse_args()
     settings = Settings()
     repo = repository(settings)
     auth = AuthService(repo, settings.initial_admin_email)
     admin_id = ensure_account(repo, auth, args.admin_email, password=args.admin_password, admin=True)
     user_id = ensure_account(repo, auth, args.user_email, password=args.user_password)
-    admin_project, admin_granted = grant_pro(repo, admin_id)
-    user_project, user_granted = grant_pro(repo, user_id)
+    admin_project, admin_granted = grant_pro(repo, admin_id, args.admin_project_name)
+    user_project, user_granted = grant_pro(repo, user_id, args.user_project_name)
     print({"admin": {"project": admin_project, "granted": admin_granted}, "user": {"project": user_project, "granted": user_granted}})
 
 
