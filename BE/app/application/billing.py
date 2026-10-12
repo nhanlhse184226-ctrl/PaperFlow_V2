@@ -5,6 +5,7 @@ Return URLs are UX only and never activate a plan.
 """
 
 import secrets
+import re
 from dataclasses import asdict, dataclass
 
 from .models import AppError, now, uid
@@ -119,5 +120,7 @@ class BillingService:
                 self.repo.mark_billing_cancelled(order_code, provider_status)
         return self.repo.billing_order(order_code)
 
-    def overview(self):
-        return self.repo.billing_overview()
+    def overview(self, month: str | None = None):
+        if month is not None and not re.fullmatch(r"\d{4}-(0[1-9]|1[0-2])", month):
+            raise AppError("Tháng báo cáo phải theo định dạng YYYY-MM.", 422)
+        return self.repo.billing_overview(month)

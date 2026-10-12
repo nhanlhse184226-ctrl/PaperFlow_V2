@@ -200,6 +200,10 @@ class SqliteRepository:
         with self.connect() as db:
             db.execute("UPDATE users SET role=? WHERE email=?", (role, email))
 
+    def set_password(self, email, password_hash):
+        with self.connect() as db:
+            db.execute("UPDATE users SET password_hash=? WHERE email=?", (password_hash, email))
+
     def session(self, token_hash, user_id, expires):
         with self.connect() as db:
             db.execute("DELETE FROM sessions WHERE expires<?", (time.time(),))
@@ -276,13 +280,18 @@ class SqliteRepository:
         with self.connect() as db:
             return [dict(row) for row in db.execute("SELECT * FROM billing_orders WHERE user_id=? ORDER BY created_at DESC", (user_id,))]
 
-    def billing_overview(self):
+    def billing_overview(self, month=None):
         with self.connect() as db:
-            total = db.execute("SELECT COUNT(*) AS orders, COALESCE(SUM(amount),0) AS revenue, COUNT(DISTINCT user_id) AS customers FROM billing_orders WHERE status='PAID'").fetchone()
+            paid = "status='PAID' AND COALESCE(provider_reference,'') <> 'DEMO_GRANT'"
+            total = db.execute(f"SELECT COUNT(*) AS orders, COALESCE(SUM(amount),0) AS revenue, COUNT(DISTINCT user_id) AS customers FROM billing_orders WHERE {paid}").fetchone()
             pending = db.execute("SELECT COUNT(*) AS count FROM billing_orders WHERE status='PENDING'").fetchone()
-            trend = [dict(row) for row in db.execute("SELECT substr(COALESCE(paid_at,created_at),1,10) AS day, COALESCE(SUM(CASE WHEN status='PAID' THEN amount ELSE 0 END),0) AS revenue, COUNT(CASE WHEN status='PAID' THEN 1 END) AS orders FROM billing_orders GROUP BY day ORDER BY day DESC LIMIT 7").fetchall()][::-1]
-            recent = [dict(row) for row in db.execute("SELECT billing_orders.*, users.email FROM billing_orders JOIN users ON users.id=billing_orders.user_id ORDER BY created_at DESC LIMIT 10").fetchall()]
-            return {"revenue": total["revenue"], "paid_orders": total["orders"], "customers": total["customers"], "pending_orders": pending["count"], "trend": trend, "recent_orders": recent}
+            trend = [dict(row) for row in db.execute(f"SELECT substr(COALESCE(paid_at,created_at),1,10) AS day, SUM(amount) AS revenue, COUNT(*) AS orders FROM billing_orders WHERE {paid} GROUP BY day ORDER BY day DESC LIMIT 7").fetchall()][::-1]
+            months = [dict(row) for row in db.execute(f"SELECT substr(paid_at,1,7) AS month, SUM(amount) AS revenue, COUNT(*) AS orders FROM billing_orders WHERE {paid} GROUP BY month ORDER BY month DESC LIMIT 12").fetchall()][::-1]
+            selected = month or (months[-1]["month"] if months else time.strftime("%Y-%m", time.gmtime()))
+            month_trend = [dict(row) for row in db.execute(f"SELECT substr(paid_at,1,10) AS day, SUM(amount) AS revenue, COUNT(*) AS orders FROM billing_orders WHERE {paid} AND substr(paid_at,1,7)=? GROUP BY day ORDER BY day", (selected,)).fetchall()]
+            month_total = db.execute(f"SELECT COALESCE(SUM(amount),0) AS revenue, COUNT(*) AS orders FROM billing_orders WHERE {paid} AND substr(paid_at,1,7)=?", (selected,)).fetchone()
+            recent = [dict(row) for row in db.execute("SELECT billing_orders.*, users.email FROM billing_orders JOIN users ON users.id=billing_orders.user_id WHERE COALESCE(provider_reference,'') <> 'DEMO_GRANT' ORDER BY created_at DESC LIMIT 10").fetchall()]
+            return {"revenue": total["revenue"], "paid_orders": total["orders"], "customers": total["customers"], "pending_orders": pending["count"], "trend": trend, "months": months, "selected_month": selected, "month_trend": month_trend, "month_revenue": month_total["revenue"], "month_orders": month_total["orders"], "recent_orders": recent}
 
     @staticmethod
     def _feedback(row):

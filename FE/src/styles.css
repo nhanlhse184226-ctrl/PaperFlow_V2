@@ -2781,3 +2781,18 @@ blockquote {
     margin: auto;
   }
 }
+
+/* Admin revenue views: compact comparison first, then a focused monthly drill-down. */
+.admin-report-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 18px; }
+.admin-report-grid .analytics-card { margin-top: 0; }
+.analytics-empty { display: grid; min-height: 245px; place-items: center; margin: 16px 0 0; padding: 24px; border: 1px dashed #cdddcf; border-radius: 12px; color: var(--muted); font-size: 13px; text-align: center; }
+.admin-month-report { margin-top: 18px; }
+.admin-month-filter { display: grid; gap: 5px; min-width: 188px; color: #456153; font-size: 11px; font-weight: 750; text-transform: uppercase; letter-spacing: .06em; }
+.admin-month-filter select { min-height: 42px; padding: 8px 34px 8px 11px; border: 1px solid #b7cdb9; border-radius: 9px; background: #fff; color: var(--ink); font: inherit; font-size: 13px; letter-spacing: 0; text-transform: none; }
+.month-summary { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 20px; }
+.month-summary > div { min-width: 190px; flex: 1 1 220px; padding: 14px 16px; border: 1px solid #e0ebe0; border-radius: 11px; background: #f7faf5; }
+.month-summary small { display: block; color: var(--muted); font-size: 11px; }
+.month-summary strong { display: block; margin-top: 4px; color: var(--deep); font-family: Manrope, sans-serif; font-size: 22px; font-variant-numeric: tabular-nums; }
+.chart-column { outline-offset: 3px; }
+.chart-column:focus-visible { outline: 2px solid #245d49; border-radius: 5px; }
+@media (max-width: 800px) { .admin-report-grid { grid-template-columns: 1fr; }.admin-month-filter { width: 100%; }.admin-month-filter select { width: 100%; }.analytics-card .section-heading { align-items: flex-start; flex-wrap: wrap; } }

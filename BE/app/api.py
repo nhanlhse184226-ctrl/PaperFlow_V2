@@ -3,7 +3,7 @@ import time
 from threading import Lock
 from typing import Literal
 
-from fastapi import APIRouter, Depends, File, Request, Response, UploadFile
+from fastapi import APIRouter, Depends, File, Query, Request, Response, UploadFile
 from pydantic import Field
 
 from app.application.models import AppError, Context, Model
@@ -177,8 +177,8 @@ def create_router(service, auth, settings, billing=None, feedback=None):
         return billing.webhook(await request.body())
 
     @router.get("/admin/overview")
-    def admin_overview(current=Depends(admin)):
-        return billing.overview()
+    def admin_overview(month: str | None = Query(default=None, max_length=7), current=Depends(admin)):
+        return billing.overview(month)
 
     @router.post("/feedback/ai", status_code=201)
     def ai_feedback(body: AiFeedbackInput, current=Depends(user)):

@@ -1,6 +1,9 @@
 from fastapi.testclient import TestClient
 
+from app.application.models import uid
+from app.application.services import AuthService
 from app.main import Settings, create_app
+from app.seed_demo import ensure_account, grant_pro
 from tests.fakes import FakeAi, QUOTE, pdf_bytes
 
 
@@ -94,3 +97,53 @@ def test_billing_owner_and_legacy_project_are_preserved(tmp_path):
         register(client, "stranger@example.edu")
         assert client.post("/api/billing/checkout", json={"project_id": new, "plan_id": "pro"}).status_code == 404
         assert client.post(f"/api/billing/orders/{code}/refresh").status_code == 404
+
+
+def test_admin_monthly_report_filters_revenue_and_excludes_demo_grants(tmp_path):
+    app = create_app(Settings(data_dir=tmp_path, allowed_origins="http://testserver", allowed_hosts="testserver",
+                              initial_admin_email="admin@example.edu"), ai=FakeAi(), payment_gateway=FakePayOS())
+    with TestClient(app) as client:
+        register(client, "admin@example.edu")
+        current = client.get("/api/auth/me").json()
+        project_id = client.post("/api/projects", json={"name": "Reporting project"}).json()["id"]
+
+        def paid(code, month, amount, reference="bank"):
+            stamp = f"{month}-15T12:00:00+00:00"
+            app.state.repo.create_billing_order({
+                "id": uid(), "order_code": code, "user_id": current["id"], "project_id": project_id,
+                "project_name": "Reporting project", "plan_id": "pro", "plan_name": "Pro", "amount": amount,
+                "status": "PAID", "payment_link_id": "test", "checkout_url": None,
+                "created_at": stamp, "paid_at": stamp, "provider_reference": reference,
+            })
+
+        paid(700_000_000_001, "2026-01", 39_000)
+        paid(700_000_000_002, "2026-02", 99_000)
+        paid(700_000_000_003, "2026-02", 99_000, "DEMO_GRANT")
+        response = client.get("/api/admin/overview?month=2026-02")
+        assert response.status_code == 200
+        report = response.json()
+        assert report["revenue"] == 138_000
+        assert report["paid_orders"] == 2
+        assert report["selected_month"] == "2026-02"
+        assert report["month_revenue"] == 99_000
+        assert report["month_orders"] == 1
+        assert [item["month"] for item in report["months"]] == ["2026-01", "2026-02"]
+        assert client.get("/api/admin/overview?month=2026-13").status_code == 422
+
+
+def test_demo_seed_grants_pro_without_counting_as_revenue(tmp_path):
+    app = create_app(Settings(data_dir=tmp_path, allowed_hosts="testserver"), ai=FakeAi(), payment_gateway=FakePayOS())
+    repo = app.state.repo
+    auth = AuthService(repo)
+    admin = ensure_account(repo, auth, "admin@example.edu", password="admin-pass", admin=True)
+    user = ensure_account(repo, auth, "user@example.edu", password="user-pass")
+    assert repo.user("admin@example.edu")["role"] == "ADMIN"
+    for account in (admin, user):
+        _, created = grant_pro(repo, account)
+        assert created is True
+        _, created_again = grant_pro(repo, account)
+        assert created_again is False
+        project = next(item for item in repo.list(account) if item.name == "Demo Pro Workspace")
+        assert repo.project_billing_state(account, project.id)["plan_id"] == "pro"
+    assert repo.billing_overview()["revenue"] == 0
+    assert repo.billing_overview()["paid_orders"] == 0

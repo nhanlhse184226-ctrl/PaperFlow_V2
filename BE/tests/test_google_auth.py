@@ -38,7 +38,8 @@ def test_google_sign_in_uses_existing_session_model(tmp_path):
 
 def test_google_sign_in_is_hidden_when_not_configured(tmp_path):
     app = create_app(
-        Settings(data_dir=tmp_path, allowed_origins="http://testserver", allowed_hosts="testserver")
+        Settings(data_dir=tmp_path, allowed_origins="http://testserver", allowed_hosts="testserver",
+                 google_oauth_client_id="")
     )
     with TestClient(app) as client:
         assert client.get("/api/auth/google/config").json() == {
