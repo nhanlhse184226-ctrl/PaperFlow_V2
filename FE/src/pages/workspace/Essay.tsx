@@ -11,6 +11,7 @@ import {
   Upload,
 } from "lucide-react";
 import { api } from "../../api";
+import { useLanguage } from "../../i18n";
 import { Badge, Empty, Notice, Modal, readable } from "../../ui";
 import type { Claim, Draft, WorkspaceProps } from "../../types";
 import AiFeedback from "../../components/AiFeedback";
@@ -21,19 +22,25 @@ export default function Essay({ p, run, busy, base, inspect }: WorkspaceProps) {
     [editing, setEditing] = useState(!p.drafts.length),
     [claim, setClaim] = useState<Claim | null>(null);
   const upload = useRef<HTMLInputElement>(null);
+  const composingDraft = useRef(false);
+  const language = useLanguage();
   const draft = p.drafts.find((d) => d.id === did) || p.drafts[0];
   const activeClaim = draft?.claims.find((c) => c.id === claim?.id);
   function edit(d?: Draft) {
     setDid(d?.id || "");
-    setTitle(d?.title || "");
-    setText(d?.text || "");
+    setTitle((d?.title || "").normalize("NFC"));
+    setText((d?.text || "").normalize("NFC"));
     setEditing(true);
   }
   async function save() {
+    const normalizedTitle = title.normalize("NFC");
+    const normalizedText = text.normalize("NFC");
+    setTitle(normalizedTitle);
+    setText(normalizedText);
     const result = await api<{ id: string }>(
       base + "/drafts" + (did ? "/" + did : ""),
       did ? "PUT" : "POST",
-      { title, text },
+      { title: normalizedTitle, text: normalizedText },
     );
     setDid(result.id);
     setEditing(false);
@@ -127,7 +134,7 @@ export default function Essay({ p, run, busy, base, inspect }: WorkspaceProps) {
                   minLength={1}
                   maxLength={200}
                   value={title}
-                  onChange={(e) => setTitle(e.target.value)}
+                  onChange={(e) => setTitle(e.target.value.normalize("NFC"))}
                   placeholder="e.g. Literature review · first draft"
                 />
               </label>
@@ -139,7 +146,22 @@ export default function Essay({ p, run, busy, base, inspect }: WorkspaceProps) {
                   minLength={20}
                   maxLength={60000}
                   value={text}
-                  onChange={(e) => setText(e.target.value)}
+                  lang={language === "vi" ? "vi" : "en"}
+                  spellCheck
+                  onCompositionStart={() => {
+                    composingDraft.current = true;
+                  }}
+                  onCompositionEnd={(e) => {
+                    composingDraft.current = false;
+                    setText(e.currentTarget.value.normalize("NFC"));
+                  }}
+                  onChange={(e) =>
+                    setText(
+                      composingDraft.current
+                        ? e.target.value
+                        : e.target.value.normalize("NFC"),
+                    )
+                  }
                   placeholder="Paste your writing here, including any in-text citations…"
                 />
               </label>

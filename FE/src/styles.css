@@ -1,4 +1,4 @@
-@import url("https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;450;500;550;600;650;700&family=Manrope:wght@400;500;600;650;700;750;800&display=swap");
+@import url("https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;450;500;550;600;650;700&family=Manrope:wght@400;500;600;650;700;750;800&family=Noto+Sans:wght@400;500;600;700&display=swap");
 :root {
   font-family: "DM Sans", sans-serif;
   color: #263a35;
@@ -1638,9 +1638,12 @@ blockquote {
   font-size: 12px;
 }
 .draft-editor textarea {
-  font-family: Georgia, serif;
-  font-size: 15px;
-  line-height: 1.9;
+  /* Noto Sans reliably shapes Vietnamese precomposed and pasted combining marks. */
+  font-family: "Noto Sans", "DM Sans", Arial, sans-serif;
+  font-size: 16px;
+  line-height: 1.8;
+  font-kerning: normal;
+  text-rendering: optimizeLegibility;
 }
 .draft-header {
   display: flex;
