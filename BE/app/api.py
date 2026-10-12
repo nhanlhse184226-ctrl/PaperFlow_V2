@@ -120,6 +120,10 @@ def create_router(service, auth, settings, billing=None, feedback=None):
     def establish(credentials, request, response, register):
         allow_sign_in_attempt(request)
         token, current = auth.login(credentials.email, credentials.password, register)
+        if current["email"].lower() in {
+            item.strip().lower() for item in settings.demo_pro_emails.split(",") if item.strip()
+        }:
+            billing.ensure_demo_pro(current["id"])
         return establish_session(token, current, response)
 
     @router.post("/auth/register", status_code=201)
@@ -162,6 +166,10 @@ def create_router(service, auth, settings, billing=None, feedback=None):
 
     @router.get("/billing/me")
     def my_billing(current=Depends(user)):
+        if current["email"].lower() in {
+            item.strip().lower() for item in settings.demo_pro_emails.split(",") if item.strip()
+        }:
+            billing.ensure_demo_pro(current["id"])
         return billing.mine(current["id"])
 
     @router.post("/billing/checkout")

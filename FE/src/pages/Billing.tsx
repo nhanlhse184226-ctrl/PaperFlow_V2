@@ -240,8 +240,10 @@ export default function Billing() {
                       ? "Chọn dự án"
                       : !project.billing_enforced
                         ? "Đã có quyền sử dụng"
+                        : plan.id === project.plan_id
+                          ? "Đã mua"
                         : !available
-                          ? "Gói đã có"
+                          ? "Đã có gói cao hơn"
                           : "Thanh toán VietQR"}
                   </button>
                 </article>

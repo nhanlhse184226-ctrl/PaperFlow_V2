@@ -44,6 +44,9 @@ class Settings(BaseSettings):
     initial_admin_email: str = "lamhoangnhan20000@gmail.com"
     bootstrap_admin_email: str = ""
     bootstrap_admin_password: str = ""
+    # Explicit, internal accounts used for the project demonstration. Their Pro
+    # grants are marked DEMO_GRANT and excluded from revenue reporting.
+    demo_pro_emails: str = "admin@gmail.com,user@gmail.com"
     payos_client_id: str = ""
     payos_api_key: str = ""
     payos_checksum_key: str = ""

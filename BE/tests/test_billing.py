@@ -147,3 +147,22 @@ def test_demo_seed_grants_pro_without_counting_as_revenue(tmp_path):
         assert repo.project_billing_state(account, project.id)["plan_id"] == "pro"
     assert repo.billing_overview()["revenue"] == 0
     assert repo.billing_overview()["paid_orders"] == 0
+
+
+def test_configured_demo_account_receives_paid_pro_for_every_project(tmp_path):
+    settings = Settings(
+        data_dir=tmp_path,
+        allowed_origins="http://testserver",
+        allowed_hosts="testserver",
+        demo_pro_emails="demo@example.edu",
+    )
+    app = create_app(settings, ai=FakeAi(), payment_gateway=FakePayOS())
+    with TestClient(app) as client:
+        register(client, "demo@example.edu")
+        project_id = client.post("/api/projects", json={"name": "Current demo project"}).json()["id"]
+        billing = client.get("/api/billing/me").json()
+        states = {item["id"]: item["plan_id"] for item in billing["projects"]}
+        assert states[project_id] == "pro"
+        assert all(item["plan_id"] == "pro" for item in billing["projects"])
+        assert all(order["status"] == "PAID" for order in billing["orders"])
+        assert app.state.repo.billing_overview()["revenue"] == 0

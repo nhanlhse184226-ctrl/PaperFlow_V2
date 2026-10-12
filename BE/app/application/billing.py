@@ -8,7 +8,7 @@ import secrets
 import re
 from dataclasses import asdict, dataclass
 
-from .models import AppError, now, uid
+from .models import AppError, Context, Project, now, uid
 
 
 @dataclass(frozen=True)
@@ -50,6 +50,29 @@ class BillingService:
 
     def plans(self):
         return public_plans()
+
+    def ensure_demo_pro(self, user_id: str):
+        """Grant the agreed internal demo accounts Pro without simulating a bank payment."""
+        projects = self.repo.list(user_id)
+        if not projects:
+            project = Project(owner_id=user_id, name="Demo Pro Workspace", context=Context(title="Demo Pro Workspace"))
+            self.repo.create(project)
+            projects = [project]
+        plan = PLANS["pro"]
+        for project in projects:
+            paid_pro = any(
+                order["project_id"] == project.id and order["status"] == "PAID" and order["plan_id"] == "pro"
+                for order in self.repo.billing_orders(user_id)
+            )
+            if paid_pro:
+                continue
+            self.repo.create_billing_order({
+                "id": uid(), "order_code": secrets.randbits(50) + (1 << 49), "user_id": user_id,
+                "project_id": project.id, "project_name": project.name, "plan_id": plan.id,
+                "plan_name": "Pro · Demo", "amount": plan.amount, "status": "PAID",
+                "payment_link_id": "demo-grant", "checkout_url": None, "created_at": now(),
+                "paid_at": now(), "provider_reference": "DEMO_GRANT",
+            })
 
     def create_checkout(self, user_id: str, project_id: str, plan_id: str):
         plan = PLANS.get(plan_id)
