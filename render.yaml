@@ -12,6 +12,16 @@ services:
         value: true
       - key: COOKIE_SAMESITE
         value: none
+      # The Vercel hostname remains a safe rollback path while the public
+      # domain becomes the primary origin.  These values contain no secrets.
+      - key: ALLOWED_ORIGINS
+        value: https://paper-flow-v2.vercel.app,https://www.paperflow.space,https://paperflow.space
+      # PayOS redirects the browser here after checkout.  Payment activation
+      # still occurs only through the Render webhook after signature checks.
+      - key: PAYOS_RETURN_URL
+        value: https://www.paperflow.space/billing/result
+      - key: PAYOS_CANCEL_URL
+        value: https://www.paperflow.space/billing/result
       - key: SUPABASE_BUCKET
         value: paperflow
       # Set GOOGLE_OAUTH_CLIENT_ID in the Render dashboard. The client secret

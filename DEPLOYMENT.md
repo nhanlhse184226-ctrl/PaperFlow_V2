@@ -17,8 +17,9 @@ and **Vercel Free** for the React site. The backend creates the private
 2. In Render, create a Blueprint from this repository; it reads
    [`render.yaml`](render.yaml). Add the Supabase values and the existing
    `GEMINI_API_KEY` in Render's secret environment settings. Set
-   `ALLOWED_HOSTS` to the generated Render hostname and temporarily set
-   `ALLOWED_ORIGINS` to the future Vercel origin after it is known.
+   `ALLOWED_HOSTS` to the generated Render hostname. Keep the configured
+   `ALLOWED_ORIGINS` list exact: it contains the Vercel rollback URL plus the
+   canonical public domain and its apex redirect origin.
 3. Deploy the frontend root directory `FE` on Vercel. Its `/api/*` rewrite
    forwards to the Render API while keeping session cookies on the Vercel site.
    Do not set `VITE_API_URL`: the frontend always calls relative `/api` URLs.
@@ -26,11 +27,41 @@ and **Vercel Free** for the React site. The backend creates the private
 4. In Vercel set the build command to `npm run build` and output directory to
    `dist`. `FE/vercel.json` contains both the API proxy and SPA rewrite.
 5. Add `PAYOS_CLIENT_ID`, `PAYOS_API_KEY`, and `PAYOS_CHECKSUM_KEY` only to the
-   Render backend environment. Set both `PAYOS_RETURN_URL` and
-   `PAYOS_CANCEL_URL` to `https://paper-flow-v2.vercel.app/billing/result`.
-   Deploy, then register `https://paperflow-api.onrender.com/api/billing/payos/webhook`
-   in PayOS; the webhook must be accepted before any paid plan can activate.
-   A browser return or PayOS status lookup never grants rights by itself.
+   Render backend environment. For `paperflow.space`, set both
+   `PAYOS_RETURN_URL` and `PAYOS_CANCEL_URL` to
+   `https://www.paperflow.space/billing/result`. Keep the Vercel domain in
+   `ALLOWED_ORIGINS` until the production domain has passed login and checkout
+   verification. Deploy, then keep/register
+   `https://paperflow-api.onrender.com/api/billing/payos/webhook` in PayOS;
+   the webhook is deliberately still Render, never Vercel. It must be accepted
+   before any paid plan can activate. A browser return or PayOS status lookup
+   never grants rights by itself.
+
+## Moving a Vercel site to a custom domain
+
+1. Add both the apex and `www` domain in Vercel. Use one canonical hostname;
+   PaperFlow uses `https://www.paperflow.space`, with the apex redirecting to
+   it. Do not remove `https://paper-flow-v2.vercel.app`; it is the rollback
+   address while the migration is verified.
+2. At the DNS provider, use only the exact records Vercel displays. Wait for
+   both domain rows to show **Valid Configuration** and for SSL generation to
+   finish before changing hosted application settings.
+3. In Render, retain `ENVIRONMENT=production`, `SECURE_COOKIES=true`, and
+   `COOKIE_SAMESITE=none`. Set `ALLOWED_ORIGINS` to this exact comma-separated
+   list:
+   `https://paper-flow-v2.vercel.app,https://www.paperflow.space,https://paperflow.space`.
+   Do not add the frontend hostname to `ALLOWED_HOSTS`: that setting protects
+   requests that arrive at the Render API and must retain the Render hostname.
+4. Set both PayOS browser redirect variables to
+   `https://www.paperflow.space/billing/result`. Do not change the PayOS
+   webhook URL from `https://paperflow-api.onrender.com/api/billing/payos/webhook`.
+   Existing pending orders retain their original redirect URL; they remain safe
+   because payment entitlement only changes after a signature-verified webhook.
+5. Save the Render environment values, deploy the service, then verify before
+   announcing the domain: anonymous page load, registration/login, one saved
+   workspace write, PDF upload, and a low-value PayOS checkout. Verify that a
+   plan changes only after the webhook, not merely after returning to the
+   result page. Test both the canonical domain and the legacy Vercel URL.
 
 The first cold request to a Render Free service can be slow. Supabase Free has
 finite capacity, so export production data regularly. Render Free does not
