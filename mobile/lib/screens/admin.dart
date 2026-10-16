@@ -30,10 +30,12 @@ class _AdminScreenState extends State<AdminScreen> {
 
   @override
   Widget build(BuildContext context) {
-    if (error != null)
+    if (error != null) {
       return PageBody(children: [ErrorNotice(error!, retry: load)]);
-    if (data == null)
+    }
+    if (data == null) {
       return const PageBody(children: [Working('Đang tải báo cáo…')]);
+    }
     final trend = objects(data!['trend']);
     final maximum = trend.fold<double>(1, (max, item) {
       final value = (item['revenue'] as num?)?.toDouble() ?? 0;
@@ -47,7 +49,7 @@ class _AdminScreenState extends State<AdminScreen> {
         ),
         const SizedBox(height: 8),
         const Text(
-          'Chỉ tính đơn PayOS đã xác nhận.',
+          'Chỉ tính giao dịch đã xác nhận.',
           style: TextStyle(color: muted),
         ),
         const SizedBox(height: 20),

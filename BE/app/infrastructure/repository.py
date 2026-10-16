@@ -221,6 +221,19 @@ class SqliteRepository:
         with self.connect() as db:
             db.execute("DELETE FROM sessions WHERE token_hash=?", (token_hash,))
 
+    def delete_account(self, user_id):
+        """Remove one owner's rows without retaining their research identity."""
+        with self.connect() as db:
+            # These tables deliberately retain foreign keys without a cascade in
+            # the initial schema, so remove the owner's rows explicitly before
+            # removing the account. Project children use ON DELETE CASCADE.
+            db.execute("DELETE FROM feedback_items WHERE user_id=?", (user_id,))
+            db.execute("DELETE FROM billing_orders WHERE user_id=?", (user_id,))
+            db.execute("DELETE FROM notes WHERE owner_id=?", (user_id,))
+            db.execute("DELETE FROM projects WHERE owner_id=?", (user_id,))
+            db.execute("DELETE FROM sessions WHERE user_id=?", (user_id,))
+            db.execute("DELETE FROM users WHERE id=?", (user_id,))
+
     def notes(self, query):
         with self.connect() as db:
             return [

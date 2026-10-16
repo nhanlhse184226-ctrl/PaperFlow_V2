@@ -3,7 +3,7 @@ from .ports import Repository
 
 
 AI_MODULES = {"topic_analysis", "source_evaluation", "compare_sources", "essay_evidence_check"}
-REASONS = {"INCORRECT", "MISSING_INFORMATION", "CITATION_EVIDENCE", "TOO_VERBOSE", "OTHER"}
+REASONS = {"INCORRECT", "MISSING_INFORMATION", "CITATION_EVIDENCE", "TOO_VERBOSE", "HARMFUL_OR_OFFENSIVE", "OTHER"}
 PRODUCT_TYPES = {"BUG", "SUGGESTION", "OTHER"}
 STATUSES = {"NEW", "REVIEWED", "RESOLVED"}
 

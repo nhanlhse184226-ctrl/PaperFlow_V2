@@ -2,6 +2,8 @@ import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 
+import 'language.dart';
+
 const ink = Color(0xFF173E36);
 const teal = Color(0xFF205D50);
 const paper = Color(0xFFF6F7F2);
@@ -17,14 +19,14 @@ ThemeData paperTheme() {
       ).copyWith(
         primary: teal,
         onPrimary: Colors.white,
-        surface: paper,
+        surface: Colors.white,
         secondary: const Color(0xFF8B5D16),
       );
   return ThemeData(
     fontFamily: 'PaperFlowSans',
     useMaterial3: true,
     colorScheme: scheme,
-    scaffoldBackgroundColor: paper,
+    scaffoldBackgroundColor: const Color(0xFFF7F8F5),
     textTheme: const TextTheme(
       displaySmall: TextStyle(
         fontSize: 34,
@@ -51,7 +53,7 @@ ThemeData paperTheme() {
       bodyMedium: TextStyle(fontSize: 14, height: 1.5, color: ink),
     ),
     appBarTheme: const AppBarTheme(
-      backgroundColor: paper,
+      backgroundColor: Color(0xFFF7F8F5),
       foregroundColor: ink,
       centerTitle: false,
     ),
@@ -102,7 +104,17 @@ class PageBody extends StatelessWidget {
   Widget build(BuildContext context) => Center(
     child: ConstrainedBox(
       constraints: const BoxConstraints(maxWidth: 860),
-      child: ListView(padding: EdgeInsets.all(padding), children: children),
+      child: LayoutBuilder(
+        builder: (context, constraints) => ListView(
+          padding: EdgeInsets.fromLTRB(
+            constraints.maxWidth >= 600 ? 32 : padding,
+            20,
+            constraints.maxWidth >= 600 ? 32 : padding,
+            104,
+          ),
+          children: children,
+        ),
+      ),
     ),
   );
 }
@@ -155,7 +167,7 @@ class ErrorNotice extends StatelessWidget {
             TextButton.icon(
               onPressed: retry,
               icon: const Icon(Icons.refresh),
-              label: const Text('Thử lại'),
+              label: Text(tr(context, 'Thử lại', 'Try again')),
             ),
         ],
       ),
@@ -344,9 +356,13 @@ class _WorkingState extends State<Working> with SingleTickerProviderStateMixin {
                 : widget.progress,
           ),
           const SizedBox(height: 8),
-          const Text(
-            'Kết quả sẽ được lưu trên máy chủ.',
-            style: TextStyle(fontSize: 12, color: muted),
+          Text(
+            tr(
+              context,
+              'Kết quả sẽ được lưu trên máy chủ.',
+              'Results are saved on the server.',
+            ),
+            style: const TextStyle(fontSize: 12, color: muted),
           ),
         ],
       ),

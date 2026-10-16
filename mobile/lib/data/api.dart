@@ -214,6 +214,11 @@ class PaperApi {
     await forget();
   }
 
+  Future<void> deleteAccount() async {
+    await request('/auth/me', method: 'DELETE');
+    await forget();
+  }
+
   Future<List<Json>> projects() async => objects(await request('/projects'));
   Future<Json> project(String id) async =>
       object(await request('/projects/$id'));

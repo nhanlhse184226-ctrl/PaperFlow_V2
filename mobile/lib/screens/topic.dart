@@ -4,6 +4,7 @@ import '../data/api.dart';
 import '../data/workspace.dart';
 import '../ui/design.dart';
 import '../ui/feedback.dart';
+import '../ui/language.dart';
 
 class TopicTab extends StatefulWidget {
   const TopicTab({super.key, required this.work});
@@ -29,9 +30,10 @@ class _TopicTabState extends State<TopicTab> {
                 data: data,
               ),
             );
-            if (!ok)
+            if (!ok) {
               throw widget.work.error ??
                   ApiFailure('Dự án đang xử lý. Thử lưu lại sau.');
+            }
           },
           invalidates: widget.work.project!['analysis'] != null,
         ),
@@ -128,7 +130,7 @@ class _TopicTabState extends State<TopicTab> {
                         result = object(
                           await w.post(
                             '/topic/translation',
-                            data: {'language': 'vi'},
+                            data: {'language': LanguageScope.of(context).code},
                           ),
                         );
                       });
@@ -139,7 +141,11 @@ class _TopicTabState extends State<TopicTab> {
                         });
                       }
                     },
-              child: const Text('Tiếng Việt'),
+              child: Text(
+                LanguageScope.of(context).isVietnamese
+                    ? 'Tiếng Việt'
+                    : 'English',
+              ),
             ),
           ),
           Panel(child: SelectableText(textOf(a, 'summary'))),
@@ -249,8 +255,9 @@ class _TopicEditorState extends State<TopicEditor> {
           context,
           'Cập nhật đề tài?',
           'Thay đổi sẽ bỏ xác nhận và làm các đánh giá phụ thuộc cần kiểm tra lại trên cả web và app.',
-        ))
+        )) {
       return;
+    }
     if (!mounted) return;
     final data = <String, dynamic>{
       for (final e in fields.entries) e.key: e.value.text.trim(),

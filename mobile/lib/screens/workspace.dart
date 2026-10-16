@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../data/api.dart';
 import '../data/workspace.dart';
 import '../ui/design.dart';
+import '../ui/language.dart';
 import 'topic.dart';
 import 'sources.dart';
 import 'evidence.dart';
@@ -72,22 +73,29 @@ class _WorkspaceScreenState extends State<WorkspaceScreen> {
     builder: (context, _) => Scaffold(
       appBar: AppBar(
         title: Text(
-          textOf(work.project ?? {}, 'name', 'Dự án'),
+          textOf(work.project ?? {}, 'name', tr(context, 'Dự án', 'Project')),
           overflow: TextOverflow.ellipsis,
         ),
         actions: [
+          const LanguageToggle(),
           IconButton(
             onPressed: work.busy ? null : work.load,
-            tooltip: 'Đồng bộ với web',
+            tooltip: tr(context, 'Đồng bộ với web', 'Sync with web'),
             icon: const Icon(Icons.sync),
           ),
           PopupMenuButton<String>(
             enabled: work.project != null && !work.locked,
-            tooltip: 'Tùy chọn dự án',
+            tooltip: tr(context, 'Tùy chọn dự án', 'Project options'),
             onSelected: menu,
-            itemBuilder: (_) => const [
-              PopupMenuItem(value: 'rename', child: Text('Đổi tên')),
-              PopupMenuItem(value: 'delete', child: Text('Xóa dự án')),
+            itemBuilder: (_) => [
+              PopupMenuItem(
+                value: 'rename',
+                child: Text(tr(context, 'Đổi tên', 'Rename')),
+              ),
+              PopupMenuItem(
+                value: 'delete',
+                child: Text(tr(context, 'Xóa dự án', 'Delete project')),
+              ),
             ],
           ),
         ],
@@ -105,8 +113,16 @@ class _WorkspaceScreenState extends State<WorkspaceScreen> {
                         Expanded(
                           child: Text(
                             work.confirmed
-                                ? 'Hướng nghiên cứu đã xác nhận'
-                                : 'Bắt đầu bằng việc xác nhận đề tài',
+                                ? tr(
+                                    context,
+                                    'Hướng nghiên cứu đã xác nhận',
+                                    'Research direction confirmed',
+                                  )
+                                : tr(
+                                    context,
+                                    'Bắt đầu bằng việc xác nhận đề tài',
+                                    'Start by confirming your topic',
+                                  ),
                             style: const TextStyle(color: muted, fontSize: 12),
                           ),
                         ),
@@ -139,7 +155,11 @@ class _WorkspaceScreenState extends State<WorkspaceScreen> {
                 child: Working(
                   work.busy
                       ? work.label
-                      : 'Máy chủ đang xử lý. Đang kiểm tra tiến độ…',
+                      : tr(
+                          context,
+                          'Máy chủ đang xử lý. Đang kiểm tra tiến độ…',
+                          'The server is processing. Checking progress…',
+                        ),
                   progress: work.progress,
                 ),
               ),
@@ -180,22 +200,22 @@ class _WorkspaceScreenState extends State<WorkspaceScreen> {
       bottomNavigationBar: NavigationBar(
         selectedIndex: tab,
         onDestinationSelected: (i) => setState(() => tab = i),
-        destinations: const [
+        destinations: [
           NavigationDestination(
             icon: Icon(Icons.explore_outlined),
-            label: 'Đề tài',
+            label: tr(context, 'Đề tài', 'Topic'),
           ),
           NavigationDestination(
             icon: Icon(Icons.description_outlined),
-            label: 'Tài liệu',
+            label: tr(context, 'Tài liệu', 'Sources'),
           ),
           NavigationDestination(
             icon: Icon(Icons.account_tree_outlined),
-            label: 'Bằng chứng',
+            label: tr(context, 'Bằng chứng', 'Evidence'),
           ),
           NavigationDestination(
             icon: Icon(Icons.fact_check_outlined),
-            label: 'Bài viết',
+            label: tr(context, 'Bài viết', 'Essay check'),
           ),
         ],
       ),

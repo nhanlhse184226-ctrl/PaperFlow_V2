@@ -58,7 +58,7 @@ class AiFeedbackInput(Model):
     project_id: str = Field(min_length=1, max_length=100)
     result_id: str = Field(min_length=1, max_length=100)
     helpful: bool
-    reason: Literal["INCORRECT", "MISSING_INFORMATION", "CITATION_EVIDENCE", "TOO_VERBOSE", "OTHER"] | None = None
+    reason: Literal["INCORRECT", "MISSING_INFORMATION", "CITATION_EVIDENCE", "TOO_VERBOSE", "HARMFUL_OR_OFFENSIVE", "OTHER"] | None = None
     comment: str = Field(default="", max_length=1000)
 
 
@@ -152,6 +152,17 @@ def create_router(service, auth, settings, billing=None, feedback=None):
     @router.get("/auth/me")
     def me(current=Depends(user)):
         return current
+
+    @router.delete("/auth/me")
+    def delete_account(request: Request, response: Response, current=Depends(user)):
+        service.delete_account(current["id"])
+        response.delete_cookie(
+            "paperflow_session",
+            path="/",
+            secure=settings.secure_cookies,
+            samesite=settings.cookie_samesite,
+        )
+        return {"ok": True}
 
     @router.post("/auth/logout")
     def logout(request: Request, response: Response):

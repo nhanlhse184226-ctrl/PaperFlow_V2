@@ -165,6 +165,19 @@ class WorkspaceService:
             for s in p.sources:
                 self.files.delete(s.id)
 
+    def delete_account(self, owner):
+        """Permanently remove one account and every owned research artifact.
+
+        Source files live outside the aggregate database tables, so they must
+        be removed before the repository cascades project rows. Hub notes and
+        billing rows are handled by the repository as account-owned data.
+        """
+        projects = self.repo.list(owner)
+        for project in projects:
+            for source in project.sources:
+                self.files.delete(source.id)
+        self.repo.delete_account(owner)
+
     def topic(self, owner, pid, context):
         with self.editing(owner, pid, "Saving topic") as p:
             if context != p.context:

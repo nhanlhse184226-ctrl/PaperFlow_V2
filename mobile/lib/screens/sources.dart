@@ -286,7 +286,11 @@ class SourceDetails extends StatelessWidget {
                 ...strings(evaluation['warnings']),
               ])
                 ErrorNotice(warning),
-              AiFeedback(work: work, module: 'source_evaluation', resultId: textOf(source, 'id')),
+              AiFeedback(
+                work: work,
+                module: 'source_evaluation',
+                resultId: textOf(source, 'id'),
+              ),
             ],
           ],
         ),

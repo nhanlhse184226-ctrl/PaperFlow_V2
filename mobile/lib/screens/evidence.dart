@@ -9,6 +9,7 @@ import '../data/api.dart';
 import '../data/workspace.dart';
 import '../ui/design.dart';
 import '../ui/feedback.dart';
+import '../ui/language.dart';
 
 void openPdf(BuildContext context, Workspace work, String sourceId, int page) {
   Navigator.push(
@@ -43,9 +44,62 @@ class EvidenceTab extends StatefulWidget {
 class _EvidenceTabState extends State<EvidenceTab> {
   String query = '', kind = 'all', sourceId = 'all';
   final selected = <String>{};
+  String? translatedLanguage;
+  Map<String, String> translations = {};
+  List<String> comparisonTranslations = [];
+  bool translating = false;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final activeLanguage = LanguageScope.maybeOf(context);
+    if (activeLanguage == null) return;
+    final language = activeLanguage.code;
+    if (translatedLanguage != language && widget.work.evidence.isNotEmpty) {
+      WidgetsBinding.instance.addPostFrameCallback((_) => translate(language));
+    }
+  }
+
+  Future<void> translate(String language) async {
+    if (!mounted || translating || translatedLanguage == language) return;
+    setState(() => translating = true);
+    try {
+      final ids = widget.work.evidence
+          .take(100)
+          .map((item) => textOf(item, 'id'))
+          .toList();
+      final result = object(
+        await widget.work.api.request(
+          '${widget.work.base}/matrix/translation',
+          method: 'POST',
+          data: {'language': language, 'evidence_ids': ids},
+        ),
+      );
+      if (mounted && LanguageScope.of(context).code == language) {
+        setState(() {
+          translations = object(result['evidence'])
+              .map((key, value) => MapEntry(key, '$value'));
+          comparisonTranslations = strings(result['comparisons']);
+          translatedLanguage = language;
+        });
+      }
+    } catch (_) {
+      // The original saved wording remains visible if the optional translation fails.
+    } finally {
+      if (mounted) setState(() => translating = false);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final w = widget.work;
+    final language = LanguageScope.of(context).code;
+    if (LanguageScope.maybeOf(context) != null &&
+        translatedLanguage != language &&
+        w.evidence.isNotEmpty &&
+        !translating) {
+      WidgetsBinding.instance.addPostFrameCallback((_) => translate(language));
+    }
     selected.removeWhere((id) => !w.sources.any((s) => s['id'] == id));
     if (sourceId != 'all' && !w.sources.any((s) => s['id'] == sourceId)) {
       sourceId = 'all';
@@ -63,14 +117,23 @@ class _EvidenceTabState extends State<EvidenceTab> {
     return PageBody(
       children: [
         Text(
-          'Bằng chứng,\ncó thể truy vết.',
+          tr(
+            context,
+            'Bằng chứng,\ncó thể truy vết.',
+            'Evidence,\nyou can trace.',
+          ),
           style: Theme.of(context).textTheme.headlineMedium,
         ),
         const SizedBox(height: 12),
         Text(
-          '${w.evidence.length} bằng chứng từ ${w.sources.length} tài liệu',
+          '${w.evidence.length} ${tr(context, 'bằng chứng từ', 'evidence from')} ${w.sources.length} ${tr(context, 'tài liệu', 'sources')}',
           style: const TextStyle(color: muted),
         ),
+        if (translating)
+          const Padding(
+            padding: EdgeInsets.only(top: 12),
+            child: LinearProgressIndicator(),
+          ),
         const SizedBox(height: 16),
         TextField(
           onChanged: (s) => setState(() => query = s),
@@ -172,7 +235,9 @@ class _EvidenceTabState extends State<EvidenceTab> {
                 children: [
                   StatusPill(textOf(e, 'kind')),
                   const SizedBox(height: 12),
-                  SelectableText(textOf(e, 'content')),
+                  SelectableText(
+                    translations[textOf(e, 'id')] ?? textOf(e, 'content'),
+                  ),
                   const SizedBox(height: 8),
                   Text(
                     w.sources
@@ -227,8 +292,9 @@ class _EvidenceTabState extends State<EvidenceTab> {
           icon: const Icon(Icons.compare_arrows),
           label: const Text('So sánh bằng chứng'),
         ),
-        ...objects(w.project!['comparisons']).map(
-          (c) => Padding(
+        ...objects(w.project!['comparisons']).indexed.map((entry) {
+          final index = entry.$1, c = entry.$2;
+          return Padding(
             padding: const EdgeInsets.only(top: 12),
             child: Panel(
               child: Column(
@@ -236,7 +302,11 @@ class _EvidenceTabState extends State<EvidenceTab> {
                 children: [
                   StatusPill(textOf(c, 'relationship')),
                   const SizedBox(height: 8),
-                  SelectableText(textOf(c, 'explanation')),
+                  SelectableText(
+                    index < comparisonTranslations.length
+                        ? comparisonTranslations[index]
+                        : textOf(c, 'explanation'),
+                  ),
                   for (final id in strings(c['evidence_ids']))
                     for (final e in w.evidence.where((e) => e['id'] == id))
                       TextButton.icon(
@@ -247,8 +317,8 @@ class _EvidenceTabState extends State<EvidenceTab> {
                 ],
               ),
             ),
-          ),
-        ),
+          );
+        }),
         if (objects(w.project!['comparisons']).isNotEmpty)
           AiFeedback(work: w, module: 'compare_sources', resultId: w.id),
         const SizedBox(height: 24),

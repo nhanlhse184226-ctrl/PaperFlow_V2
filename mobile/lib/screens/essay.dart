@@ -4,6 +4,7 @@ import '../data/api.dart';
 import '../data/workspace.dart';
 import '../ui/design.dart';
 import '../ui/feedback.dart';
+import '../ui/language.dart';
 import 'sources.dart';
 import 'evidence.dart';
 
@@ -35,8 +36,9 @@ class _EssayTabState extends State<EssayTab> {
                 ),
               );
             });
-            if (!ok)
+            if (!ok) {
               throw w.error ?? ApiFailure('Dự án đang xử lý. Thử lưu lại sau.');
+            }
           },
         ),
       ),
@@ -237,7 +239,11 @@ class _EssayTabState extends State<EssayTab> {
                 ),
               ),
           if (claims.isNotEmpty)
-            AiFeedback(work: w, module: 'essay_evidence_check', resultId: textOf(d, 'id')),
+            AiFeedback(
+              work: w,
+              module: 'essay_evidence_check',
+              resultId: textOf(d, 'id'),
+            ),
         ],
         const SizedBox(height: 24),
       ],
@@ -245,19 +251,78 @@ class _EssayTabState extends State<EssayTab> {
   }
 }
 
-class ClaimDetails extends StatelessWidget {
+class ClaimDetails extends StatefulWidget {
   const ClaimDetails({super.key, required this.work, required this.claim});
   final Workspace work;
   final Json claim;
+
+  @override
+  State<ClaimDetails> createState() => _ClaimDetailsState();
+}
+
+class _ClaimDetailsState extends State<ClaimDetails> {
+  Json? translated;
+  String? translatedLanguage;
+  bool translating = false;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final activeLanguage = LanguageScope.maybeOf(context);
+    if (activeLanguage == null) return;
+    final language = activeLanguage.code;
+    if (translatedLanguage != language && widget.claim['check'] != null) {
+      WidgetsBinding.instance.addPostFrameCallback((_) => translate(language));
+    }
+  }
+
+  Future<void> translate(String language) async {
+    if (!mounted || translating || translatedLanguage == language) return;
+    setState(() => translating = true);
+    try {
+      final draft = objects(widget.work.project?['drafts']).firstWhere(
+        (item) =>
+            objects(item['claims'])
+                .any((claim) => claim['id'] == widget.claim['id']),
+        orElse: () => {},
+      );
+      final draftId = textOf(draft, 'id');
+      if (draftId.isEmpty) return;
+      final result = object(
+        await widget.work.api.request(
+          '${widget.work.base}/drafts/$draftId/claims/${widget.claim['id']}/translation',
+          method: 'POST',
+          data: {'language': language},
+        ),
+      );
+      if (mounted && LanguageScope.of(context).code == language) {
+        setState(() {
+          translated = result;
+          translatedLanguage = language;
+        });
+      }
+    } catch (_) {
+      // Fall back to the saved assessment if a translation cannot be requested.
+    } finally {
+      if (mounted) setState(() => translating = false);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
-    final check = object(claim['check']);
+    final work = widget.work;
+    final check = object(widget.claim['check']);
     return Scaffold(
-      appBar: AppBar(title: const Text('Kiểm tra luận điểm')),
+      appBar: AppBar(
+        title: Text(tr(context, 'Kiểm tra luận điểm', 'Claim evidence review')),
+      ),
       body: SafeArea(
         child: PageBody(
           children: [
-            Panel(color: mint, child: SelectableText(textOf(claim, 'text'))),
+            Panel(
+              color: mint,
+              child: SelectableText(textOf(widget.claim, 'text')),
+            ),
             if (check.isEmpty)
               const EmptyView(
                 'Chưa có kết quả',
@@ -269,23 +334,39 @@ class ClaimDetails extends StatelessWidget {
                 alignment: Alignment.centerLeft,
                 child: StatusPill(textOf(check, 'status')),
               ),
+              if (translating)
+                const Padding(
+                  padding: EdgeInsets.only(top: 16),
+                  child: LinearProgressIndicator(),
+                ),
               for (final e in {
-                'explanation': 'Giải thích',
-                'relevance': 'Mức liên quan',
-                'citation_issue': 'Vấn đề trích dẫn',
-                'limitation': 'Giới hạn đánh giá',
-                'action': 'Gợi ý tiếp theo',
+                'explanation': tr(context, 'Giải thích', 'Assessment'),
+                'relevance': tr(context, 'Mức liên quan', 'Topic relevance'),
+                'citation_issue': tr(
+                  context,
+                  'Mức độ bao phủ trích dẫn',
+                  'Citation coverage',
+                ),
+                'limitation': tr(
+                  context,
+                  'Giới hạn đánh giá',
+                  'Evidence limitations',
+                ),
+                'action': tr(context, 'Gợi ý tiếp theo', 'Recommended action'),
               }.entries) ...[
                 Section(e.value),
-                SelectableText(textOf(check, e.key)),
+                SelectableText(textOf(translated ?? check, e.key)),
               ],
-              const Section('Bằng chứng liên quan'),
+              Section(
+                tr(context, 'Bằng chứng liên quan', 'Evidence connections'),
+              ),
               if (objects(check['matches']).isEmpty)
                 const Text(
                   'Chưa tìm thấy bằng chứng phù hợp. Điều này không đồng nghĩa luận điểm sai.',
                 ),
-              ...objects(check['matches']).map(
-                (m) => Padding(
+              ...objects(check['matches']).indexed.map((entry) {
+                final index = entry.$1, m = entry.$2;
+                return Padding(
                   padding: const EdgeInsets.only(bottom: 12),
                   child: Panel(
                     child: Column(
@@ -293,7 +374,11 @@ class ClaimDetails extends StatelessWidget {
                       children: [
                         StatusPill(textOf(m, 'relation')),
                         const SizedBox(height: 10),
-                        SelectableText(textOf(m, 'explanation')),
+                        SelectableText(
+                          index < strings(translated?['matches']).length
+                              ? strings(translated?['matches'])[index]
+                              : textOf(m, 'explanation'),
+                        ),
                         for (final e in work.evidence.where(
                           (e) => e['id'] == m['evidence_id'],
                         ))
@@ -305,8 +390,8 @@ class ClaimDetails extends StatelessWidget {
                       ],
                     ),
                   ),
-                ),
-              ),
+                );
+              }),
             ],
           ],
         ),
@@ -341,8 +426,9 @@ class _DraftEditorState extends State<DraftEditor> {
           context,
           'Lưu thay đổi bài viết?',
           'Luận điểm và kết quả kiểm tra cũ của bài này sẽ được đặt lại.',
-        ))
+        )) {
       return;
+    }
     if (!mounted) return;
     final data = <String, dynamic>{
       'title': title.text.trim(),

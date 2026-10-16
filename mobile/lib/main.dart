@@ -4,6 +4,7 @@ import 'data/api.dart';
 import 'screens/auth.dart';
 import 'screens/home.dart';
 import 'ui/design.dart';
+import 'ui/language.dart';
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
@@ -19,6 +20,7 @@ class PaperFlowApp extends StatefulWidget {
 
 class _PaperFlowAppState extends State<PaperFlowApp> {
   final navigator = GlobalKey<NavigatorState>();
+  final language = AppLanguage();
   Json? user;
   bool loading = true;
   Object? error;
@@ -61,39 +63,49 @@ class _PaperFlowAppState extends State<PaperFlowApp> {
   }
 
   @override
-  Widget build(BuildContext context) => MaterialApp(
-    navigatorKey: navigator,
-    title: 'PaperFlow',
-    debugShowCheckedModeBanner: false,
-    theme: paperTheme(),
-    home: loading
-        ? const Scaffold(
-            body: SafeArea(
-              child: PageBody(
-                children: [
-                  ResearchArt(),
-                  Working('Đang mở không gian nghiên cứu…'),
-                ],
+  Widget build(BuildContext context) => AnimatedBuilder(
+    animation: language,
+    builder: (_, _) => LanguageScope(
+      controller: language,
+      child: MaterialApp(
+        navigatorKey: navigator,
+        title: 'PaperFlow',
+        debugShowCheckedModeBanner: false,
+        theme: paperTheme(),
+        locale: Locale(language.code),
+        home: loading
+            ? const Scaffold(
+                body: SafeArea(
+                  child: PageBody(
+                    children: [
+                      ResearchArt(),
+                      Working('Đang mở không gian nghiên cứu…'),
+                    ],
+                  ),
+                ),
+              )
+            : error != null
+            ? Scaffold(
+                body: SafeArea(
+                  child: PageBody(
+                    children: [
+                      const ResearchArt(),
+                      ErrorNotice(error!, retry: restore),
+                    ],
+                  ),
+                ),
+              )
+            : user == null
+            ? AuthScreen(
+                api: widget.api,
+                onLogin: (u) => setState(() => user = u),
+              )
+            : HomeScreen(
+                api: widget.api,
+                user: user!,
+                onLogout: () => setState(() => user = null),
               ),
-            ),
-          )
-        : error != null
-        ? Scaffold(
-            body: SafeArea(
-              child: PageBody(
-                children: [
-                  const ResearchArt(),
-                  ErrorNotice(error!, retry: restore),
-                ],
-              ),
-            ),
-          )
-        : user == null
-        ? AuthScreen(api: widget.api, onLogin: (u) => setState(() => user = u))
-        : HomeScreen(
-            api: widget.api,
-            user: user!,
-            onLogout: () => setState(() => user = null),
-          ),
+      ),
+    ),
   );
 }

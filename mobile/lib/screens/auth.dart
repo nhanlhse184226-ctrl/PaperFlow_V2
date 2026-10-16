@@ -3,9 +3,11 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import 'package:flutter_svg/flutter_svg.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../data/api.dart';
 import '../ui/design.dart';
+import '../ui/language.dart';
 
 class AuthScreen extends StatefulWidget {
   const AuthScreen({super.key, required this.api, required this.onLogin});
@@ -112,19 +114,33 @@ class _AuthScreenState extends State<AuthScreen> {
                       'PaperFlow',
                       style: Theme.of(context).textTheme.titleLarge,
                     ),
+                    const Spacer(),
+                    const LanguageToggle(),
                   ],
                 ),
                 const ResearchArt(height: 210),
                 Text(
                   register
-                      ? 'Ý tưởng của bạn.\nKhởi đầu tại đây.'
-                      : 'Từ ý tưởng\nđến bằng chứng.',
+                      ? tr(
+                          context,
+                          'Ý tưởng của bạn.\nKhởi đầu tại đây.',
+                          'Your idea.\nStart here.',
+                        )
+                      : tr(
+                          context,
+                          'Từ ý tưởng\nđến bằng chứng.',
+                          'From ideas\nto evidence.',
+                        ),
                   style: Theme.of(context).textTheme.displaySmall,
                 ),
                 const SizedBox(height: 10),
-                const Text(
-                  'Một nơi cho đề tài, tài liệu và bài viết.',
-                  style: TextStyle(color: muted),
+                Text(
+                  tr(
+                    context,
+                    'Một nơi cho đề tài, tài liệu và bài viết.',
+                    'One place for topics, sources, and writing.',
+                  ),
+                  style: const TextStyle(color: muted),
                 ),
                 const SizedBox(height: 24),
                 AutofillGroup(
@@ -140,16 +156,20 @@ class _AuthScreenState extends State<AuthScreen> {
                           autofillHints: const [AutofillHints.email],
                           textInputAction: TextInputAction.next,
                           maxLength: 254,
-                          decoration: const InputDecoration(
-                            labelText: 'Email',
-                            prefixIcon: Icon(Icons.alternate_email),
+                          decoration: InputDecoration(
+                            labelText: tr(context, 'Email', 'Email address'),
+                            prefixIcon: const Icon(Icons.alternate_email),
                             counterText: '',
                           ),
                           validator: (v) =>
                               RegExp(r'^[^\s@]+@[^\s@]+\.[^\s@]+$')
                                   .hasMatch((v ?? '').trim())
                               ? null
-                              : 'Nhập email hợp lệ',
+                              : tr(
+                                  context,
+                                  'Nhập email hợp lệ',
+                                  'Enter a valid email',
+                                ),
                         ),
                         const SizedBox(height: 14),
                         TextFormField(
@@ -164,14 +184,22 @@ class _AuthScreenState extends State<AuthScreen> {
                           ],
                           maxLength: 128,
                           decoration: InputDecoration(
-                            labelText: 'Mật khẩu',
-                            helperText: 'Ít nhất 3 ký tự',
+                            labelText: tr(context, 'Mật khẩu', 'Password'),
+                            helperText: tr(
+                              context,
+                              'Ít nhất 3 ký tự',
+                              'At least 3 characters',
+                            ),
                             counterText: '',
                             prefixIcon: const Icon(Icons.lock_outline_rounded),
                             suffixIcon: IconButton(
                               tooltip: obscure
-                                  ? 'Hiện mật khẩu'
-                                  : 'Ẩn mật khẩu',
+                                  ? tr(
+                                      context,
+                                      'Hiện mật khẩu',
+                                      'Show password',
+                                    )
+                                  : tr(context, 'Ẩn mật khẩu', 'Hide password'),
                               onPressed: () =>
                                   setState(() => obscure = !obscure),
                               icon: Icon(
@@ -183,7 +211,11 @@ class _AuthScreenState extends State<AuthScreen> {
                           ),
                           validator: (v) => (v ?? '').length >= 3
                               ? null
-                              : 'Mật khẩu cần ít nhất 3 ký tự',
+                              : tr(
+                                  context,
+                                  'Mật khẩu cần ít nhất 3 ký tự',
+                                  'Password needs at least 3 characters',
+                                ),
                           onFieldSubmitted: (_) => submit(),
                         ),
                       ],
@@ -193,7 +225,15 @@ class _AuthScreenState extends State<AuthScreen> {
                 if (error != null) ErrorNotice(error!),
                 const SizedBox(height: 18),
                 if (busy)
-                  Working(register ? 'Đang tạo tài khoản…' : 'Đang đăng nhập…'),
+                  Working(
+                    register
+                        ? tr(
+                            context,
+                            'Đang tạo tài khoản…',
+                            'Creating account…',
+                          )
+                        : tr(context, 'Đang đăng nhập…', 'Signing in…'),
+                  ),
                 if (!busy)
                   SizedBox(
                     width: double.infinity,
@@ -201,19 +241,23 @@ class _AuthScreenState extends State<AuthScreen> {
                       key: const Key('auth-submit'),
                       onPressed: submit,
                       icon: const Icon(Icons.arrow_forward_rounded),
-                      label: Text(register ? 'Tạo tài khoản' : 'Đăng nhập'),
+                      label: Text(
+                        register
+                            ? tr(context, 'Tạo tài khoản', 'Create account')
+                            : tr(context, 'Đăng nhập', 'Sign in'),
+                      ),
                     ),
                   ),
                 if (!busy && Platform.isAndroid) ...[
                   const SizedBox(height: 12),
-                  const Row(
+                  Row(
                     children: [
                       Expanded(child: Divider()),
                       Padding(
                         padding: EdgeInsets.symmetric(horizontal: 12),
                         child: Text(
-                          'hoặc',
-                          style: TextStyle(color: muted, fontSize: 12),
+                          tr(context, 'hoặc', 'or'),
+                          style: const TextStyle(color: muted, fontSize: 12),
                         ),
                       ),
                       Expanded(child: Divider()),
@@ -231,7 +275,13 @@ class _AuthScreenState extends State<AuthScreen> {
                           height: 20,
                         ),
                       ),
-                      label: const Text('Tiếp tục với Google'),
+                      label: Text(
+                        tr(
+                          context,
+                          'Tiếp tục với Google',
+                          'Continue with Google',
+                        ),
+                      ),
                     ),
                   ),
                 ],
@@ -245,21 +295,48 @@ class _AuthScreenState extends State<AuthScreen> {
                           }),
                     child: Text(
                       register
-                          ? 'Đã có tài khoản? Đăng nhập'
-                          : 'Chưa có tài khoản? Đăng ký',
+                          ? tr(
+                              context,
+                              'Đã có tài khoản? Đăng nhập',
+                              'Already have an account? Sign in',
+                            )
+                          : tr(
+                              context,
+                              'Chưa có tài khoản? Đăng ký',
+                              'New to PaperFlow? Create account',
+                            ),
+                    ),
+                  ),
+                ),
+                Center(
+                  child: TextButton(
+                    onPressed: () => launchUrl(
+                      Uri.parse('https://www.paperflow.space/privacy'),
+                      mode: LaunchMode.externalApplication,
+                    ),
+                    child: Text(
+                      tr(
+                        context,
+                        'Chính sách quyền riêng tư',
+                        'Privacy policy',
+                      ),
                     ),
                   ),
                 ),
                 const SizedBox(height: 8),
-                const Row(
+                Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Icon(Icons.shield_outlined, size: 18, color: muted),
                     SizedBox(width: 8),
                     Expanded(
                       child: Text(
-                        'Dùng cùng tài khoản với web. Dự án được đồng bộ khi có mạng.',
-                        style: TextStyle(color: muted, fontSize: 12),
+                        tr(
+                          context,
+                          'Dùng cùng tài khoản với web. Dự án được đồng bộ khi có mạng.',
+                          'Use the same account as web. Projects sync when online.',
+                        ),
+                        style: const TextStyle(color: muted, fontSize: 12),
                       ),
                     ),
                   ],

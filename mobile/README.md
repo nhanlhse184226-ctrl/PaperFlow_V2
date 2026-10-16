@@ -51,10 +51,10 @@ flutter run -d <emulator-id> --dart-define=API_BASE_URL=http://10.0.2.2:8000
 - Tài liệu: picker PDF, upload có tiến độ, đánh giá/trích xuất, retry kết quả partial, xem facts và AI analysis riêng, xóa có xác nhận.
 - Bằng chứng: lọc nguồn/loại/từ khóa; so sánh nguồn đã chọn; quote/page/text; xem PDF gốc đúng trang; chia sẻ CSV có bảo vệ formula injection.
 - Bài viết: tạo/sửa text, upload PDF/TXT/MD, kiểm tra/tiếp tục/kiểm tra lại; 5 trạng thái; claim → evidence → source/page/quote.
-- Hub: tìm và đăng ghi chú công khai có xác nhận. Tài khoản và thông báo cách dùng dữ liệu.
+- Bản phát hành Google Play không hiển thị Hub. Hub sẽ chỉ trở lại sau khi backend có báo cáo nội dung, chặn người dùng và quy trình moderation đầy đủ.
 - UI tiếng Việt, minh họa vector nội bộ, font đi kèm, animation nhẹ có reduced motion, bố cục phone/tablet.
 
-Nguyên văn bằng chứng không được dịch. Backend hiện chỉ có API dịch riêng cho kết quả Topic; nhận định ở module khác có thể vẫn theo ngôn ngữ provider. Không có realtime push hoặc offline editing. Role admin, payment, account deletion và Hub moderation chưa có trong backend hiện tại, nên app không giả lập các chức năng này.
+Nguyên văn bằng chứng không được dịch. Backend hiện chỉ có API dịch riêng cho kết quả Topic; nhận định ở module khác có thể vẫn theo ngôn ngữ provider. Không có realtime push hoặc offline editing. Bản Android chuẩn bị cho Google Play không có luồng mua gói hoặc liên kết PayOS trong app: người dùng có thể dùng quyền đã mua trên web khi đăng nhập cùng tài khoản. Role admin luôn được kiểm tra tại server; app có luồng xóa vĩnh viễn tài khoản và dữ liệu sở hữu. Hub bị ẩn khỏi bản Google Play cho đến khi hoàn tất moderation.
 
 ## Kiểm thử
 

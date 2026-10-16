@@ -259,6 +259,18 @@ class PostgresRepository:
         with self.connect() as db:
             db.execute("DELETE FROM sessions WHERE token_hash=?", (token_hash,))
 
+    def delete_account(self, user_id):
+        """Remove one owner's rows without retaining their research identity."""
+        with self.connect() as db:
+            # Keep this explicit rather than relying on deployment-specific
+            # foreign-key cascades. It mirrors the SQLite repository exactly.
+            db.execute("DELETE FROM feedback_items WHERE user_id=?", (user_id,))
+            db.execute("DELETE FROM billing_orders WHERE user_id=?", (user_id,))
+            db.execute("DELETE FROM notes WHERE owner_id=?", (user_id,))
+            db.execute("DELETE FROM projects WHERE owner_id=?", (user_id,))
+            db.execute("DELETE FROM sessions WHERE user_id=?", (user_id,))
+            db.execute("DELETE FROM users WHERE id=?", (user_id,))
+
     def notes(self, query):
         with self.connect() as db:
             return [

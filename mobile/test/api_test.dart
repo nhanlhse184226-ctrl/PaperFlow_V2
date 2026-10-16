@@ -144,6 +144,30 @@ void main() {
     await api.projects();
     expect(storage.value, isNull);
   });
+  test(
+    'account deletion removes the native session after server confirmation',
+    () async {
+      final storage = MemoryStore()
+        ..value = jsonEncode({
+          'token': 'session',
+          'expires': DateTime.now()
+              .add(const Duration(days: 1))
+              .toIso8601String(),
+        });
+      final dio = Dio()
+        ..httpClientAdapter = ReplyAdapter((request) {
+          expect(request.path, '/auth/me');
+          expect(request.method, 'DELETE');
+          expect(request.headers['cookie'], 'paperflow_session=session');
+          return jsonReply({'ok': true});
+        });
+      final api = PaperApi(store: storage, client: dio);
+      await api.restore();
+      await api.deleteAccount();
+      expect(storage.value, isNull);
+      expect(api.hasSession, isFalse);
+    },
+  );
   test('CSV retains quote/page and neutralizes spreadsheet formulas', () {
     final csv = evidenceCsv([
       {
