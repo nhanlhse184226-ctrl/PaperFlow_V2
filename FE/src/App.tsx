@@ -6,11 +6,14 @@ import type { User } from "./types";
 import Auth from "./auth/Auth";
 import Shell from "./layout/Shell";
 import { LanguageToggle } from "./i18n";
+import Legal, { legalKind } from "./pages/Legal";
 export default function App() {
   const [user, setUser] = useState<User | null>(null),
     [loading, setLoading] = useState(true),
     [error, setError] = useState("");
+  const legal = legalKind(window.location.pathname);
   const load = useCallback(() => {
+    if (legal) return;
     setLoading(true);
     setError("");
     api<User>("/auth/me")
@@ -19,8 +22,9 @@ export default function App() {
         if (!(e instanceof ApiError && e.status === 401)) setError(message(e));
       })
       .finally(() => setLoading(false));
-  }, []);
+  }, [legal]);
   useEffect(load, [load]);
+  if (legal) return <Legal kind={legal} />;
   if (loading)
     return (
       <div className="boot">
