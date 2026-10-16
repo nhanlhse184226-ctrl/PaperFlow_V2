@@ -27,11 +27,11 @@ const content: Record<
       ],
       [
         "AI processing",
-        "AI analysis is requested only when you start an analysis, evaluation, comparison, translation, or writing check. AI output can be inaccurate and does not replace your academic judgment. Original quotations remain traceable to their source.",
+        "AI analysis is requested only when you start an analysis, evaluation, comparison, translation, or writing check. The material needed for that requested action is sent to Google's Gemini API to generate the result. AI output can be inaccurate and does not replace your academic judgment. Original quotations remain traceable to their source.",
       ],
       [
         "Storage and sharing",
-        "PaperFlow uses hosted application, database, and file-storage services to run the workspace. Access is limited to operating the service and resolving support or security issues. We do not publish your research projects or PDFs.",
+        "PaperFlow uses hosted application, database, and file-storage services to run the workspace, and Google Gemini for requested AI processing. Access is limited to operating the service and resolving support or security issues. We do not sell, advertise with, or publish your research projects or PDFs.",
       ],
       [
         "Account deletion",
