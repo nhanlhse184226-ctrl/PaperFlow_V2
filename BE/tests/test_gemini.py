@@ -38,8 +38,15 @@ def test_structured_output():
     ],
 )
 def test_malformed_and_refused(data):
-    with pytest.raises(AppError, match="invalid"):
-        provider(lambda r: httpx.Response(200, json=data)).extract_claims("Academic draft")
+    calls = []
+
+    def handle(request):
+        calls.append(request)
+        return httpx.Response(200, json=data)
+
+    with pytest.raises(AppError, match="automatic retries"):
+        provider(handle).extract_claims("Academic draft")
+    assert len(calls) == 3
 
 
 @pytest.mark.parametrize("status", [400, 401, 403, 404, 429, 500, 503])
@@ -54,7 +61,7 @@ def test_provider_failures(status, monkeypatch):
     with pytest.raises(AppError) as exc:
         provider(handle).extract_claims("Academic draft")
     assert "Secret" not in exc.value.message
-    assert len(calls) == (2 if status in [429, 500, 503] else 1)
+    assert len(calls) == (3 if status in [429, 500, 503] else 1)
 
 
 def test_timeout():
@@ -92,5 +99,29 @@ def test_provider_schema_preserves_contract_without_large_grammar_bounds():
     "data", [{"candidates": [None]}, {"candidates": [{"finishReason": "STOP", "content": None}]}, [], None]
 )
 def test_invalid_response_shapes(data):
-    with pytest.raises(AppError, match="invalid"):
-        provider(lambda r: httpx.Response(200, json=data)).extract_claims("Academic draft")
+    calls = []
+
+    def handle(request):
+        calls.append(request)
+        return httpx.Response(200, json=data)
+
+    with pytest.raises(AppError, match="automatic retries"):
+        provider(handle).extract_claims("Academic draft")
+    assert len(calls) == 3
+
+
+def test_invalid_structured_result_is_retried_until_a_valid_result_arrives():
+    attempts = 0
+
+    def handle(request):
+        nonlocal attempts
+        attempts += 1
+        if attempts < 3:
+            return httpx.Response(200, json={"candidates": []})
+        return httpx.Response(
+            200,
+            json={"candidates": [{"finishReason": "STOP", "content": {"parts": [{"text": '{"claims":[]}'}]}}]},
+        )
+
+    assert provider(handle).extract_claims("Academic draft").claims == []
+    assert attempts == 3

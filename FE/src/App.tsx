@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { LoaderCircle } from "lucide-react";
+import { useNavigate } from "react-router-dom";
 import { api, ApiError } from "./api";
 import { Notice, Brand, message } from "./ui";
 import type { User } from "./types";
@@ -12,6 +13,13 @@ export default function App() {
     [loading, setLoading] = useState(true),
     [error, setError] = useState("");
   const legal = legalKind(window.location.pathname);
+  const navigate = useNavigate();
+  function completeLogin(currentUser: User) {
+    setUser(currentUser);
+    // A sign-in always starts from the workspace overview instead of leaving
+    // a stale deep link (for example, a previous topic check) open.
+    navigate("/", { replace: true });
+  }
   const load = useCallback(() => {
     if (legal) return;
     setLoading(true);
@@ -47,7 +55,7 @@ export default function App() {
         <div className="auth-language">
           <LanguageToggle />
         </div>
-        <Auth onLogin={setUser} />
+        <Auth onLogin={completeLogin} />
       </>
     );
   return (

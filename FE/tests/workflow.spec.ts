@@ -22,6 +22,7 @@ test("connected research workflow, provenance, persistence, and responsive UI", 
   await expect(
     page.getByRole("heading", { name: "A little clarity.", exact: false }),
   ).toBeVisible();
+  await expect(page).toHaveURL(/\/$/);
   await page.screenshot({
     path: "../artifacts/dashboard-desktop.png",
     fullPage: true,
@@ -33,6 +34,7 @@ test("connected research workflow, provenance, persistence, and responsive UI", 
   await page
     .getByRole("button", { name: "Create project", exact: true })
     .click();
+  await page.getByRole("link", { name: "Topic direction", exact: true }).click();
   await page
     .getByLabel("What do you want to explore?")
     .fill(

@@ -79,7 +79,10 @@ class GeminiAiProvider:
             },
         }
         with httpx.Client(timeout=90, transport=self.transport) as client:
-            for attempt in range(2):
+            # Gemini occasionally returns a syntactically valid response with
+            # no usable structured candidate. Retry the generation before
+            # surfacing an error; validation remains the gatekeeper.
+            for attempt in range(3):
                 try:
                     response = client.post(
                         f"https://generativelanguage.googleapis.com/v1beta/models/{self.model}:generateContent",
@@ -99,7 +102,7 @@ class GeminiAiProvider:
                     attempt + 1,
                     response.status_code,
                 )
-                if response.status_code in (429, 500, 502, 503) and attempt == 0:
+                if response.status_code in (429, 500, 502, 503) and attempt < 2:
                     time.sleep(1)
                     continue
                 if response.status_code == 429:
@@ -133,8 +136,15 @@ class GeminiAiProvider:
                     )
                     return schema.model_validate_json(content)
                 except (KeyError, IndexError, TypeError, AttributeError, ValueError, ValidationError):
+                    if attempt < 2:
+                        logger.warning(
+                            "Gemini task=%s returned invalid structured output; retrying attempt=%s",
+                            schema.__name__,
+                            attempt + 1,
+                        )
+                        continue
                     raise AppError(
-                        "AI returned an incomplete or invalid result. No unverified result was accepted; retry.",
+                        "AI could not return a complete verified result after automatic retries. Please try again later.",
                         502,
                     ) from None
 

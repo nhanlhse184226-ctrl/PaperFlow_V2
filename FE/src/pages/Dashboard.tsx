@@ -42,7 +42,7 @@ export default function Dashboard({ all = false }: { all?: boolean }) {
     try {
       const name = new FormData(e.currentTarget).get("name");
       const p = await api<{ id: string }>("/projects", "POST", { name });
-      navigate("/projects/" + p.id + "/topic");
+      navigate("/projects/" + p.id + "/overview");
     } catch (e) {
       setError(message(e));
     } finally {
