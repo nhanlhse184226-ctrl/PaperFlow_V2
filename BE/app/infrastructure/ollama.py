@@ -78,16 +78,18 @@ class OllamaAiProvider:
                         502,
                     ) from None
 
-    def analyze_topic(self, context):
+    def analyze_topic(self, context, evidence):
         return self._run(
-            "Assess all six distinct readiness dimensions. The dimensions array MUST contain exactly one item each named clarity, scope, feasibility, researchability, source readiness, and data readiness. Suggest refinements/directions and keywords. Mark unprovided resources unknown; do not claim to have searched literature. "
+            "Assess all six distinct readiness dimensions using ONLY the supplied verified evidence from uploaded PDFs. The dimensions array MUST contain exactly one item each named clarity, scope, feasibility, researchability, source readiness, and data readiness. "
+            "Source readiness and data readiness must describe the actual uploaded documents, never a generic statement about research type. "
+            "Suggest refinements/directions and keywords grounded in supplied material. "
             + (
                 "Write ALL free-text values in Vietnamese. "
                 if context.output_language == "vi"
                 else "Write ALL free-text values in English. "
             )
             + "Keep schema enum values unchanged.",
-            context.model_dump(),
+            {"topic": context.model_dump(), "evidence": [item.model_dump() for item in evidence]},
             TopicAnalysis,
         )
 

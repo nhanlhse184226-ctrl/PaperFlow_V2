@@ -184,20 +184,37 @@ class WorkspaceService:
                 p.context, p.analysis, p.confirmed = context, None, False
                 p.analysis_translations = {}
                 for s in p.sources:
-                    s.evaluation = None
+                    # Source extraction is topic-sensitive. A changed research
+                    # context must not let an earlier evidence selection feed
+                    # the next topic check.
+                    s.evaluation, s.evidence, s.evidence_done = None, [], False
                     s.status = "extracted" if s.pages else "failed"
                 invalidate_reports(p)
                 self.record(p, "Topic updated; confirmation and topic-dependent reports need review")
 
     def analyze(self, owner, pid, force=False):
-        with self.editing(owner, pid, "Analyzing topic") as p:
+        with self.editing(owner, pid, "Reading documents and analyzing topic") as p:
             if not p.analysis or force:
-                result = self.ai.analyze_topic(p.context)
+                readable = [source for source in p.sources if source.pages]
+                if not readable:
+                    raise AppError("Upload at least one readable PDF before checking the topic.")
+                # Topic feedback must come from the project's documents, rather
+                # than a generic assessment of the text fields. Processing also
+                # gives every conclusion a verified quotation and page target.
+                for source in readable:
+                    if not source.evidence_done:
+                        self._process_source(p, source)
+                evidence = self.evidence(p)
+                if not evidence:
+                    raise AppError(
+                        "The uploaded PDFs did not yield a verified quotation to ground this check. Review the PDFs or add a readable source."
+                    )
+                result = self.ai.analyze_topic(p.context, evidence)
                 if len({d.name for d in result.dimensions}) != 6:
                     raise AppError("Topic analysis omitted a readiness dimension. Retry.", 502)
                 p.analysis = result
                 p.analysis_translations = {}
-                self.record(p, "Topic readiness analyzed")
+                self.record(p, "Topic checked against uploaded documents")
 
     def translated_topic(self, owner, pid, language):
         with self.editing(owner, pid, "Translating topic analysis") as p:
@@ -293,75 +310,78 @@ class WorkspaceService:
             s = self.source(p, sid)
             if not s.pages:
                 raise AppError(s.error or "Upload a readable PDF first.")
-            if force:
-                s.evaluation = None
-                s.evidence_done = False
-            if s.evaluation and s.evidence_done and not force:
-                return
-            try:
-                if not s.evaluation or force:
-                    # Metadata evaluation uses a clearly disclosed bounded source excerpt.
-                    selected, length = [], 0
-                    for page in s.pages:
-                        if length + len(page.text) > 80000:
-                            break
-                        selected.append(page)
-                        length += len(page.text)
-                    evaluation = self.ai.evaluate_source(p.context, selected)
-                    valid = [
-                        f
-                        for f in evaluation.facts
-                        if grounded(selected, f.page, f.quote)
-                        and normalize(f.value).lower() in normalize(f.quote).lower()
-                    ]
-                    if len(valid) != len(evaluation.facts):
-                        evaluation.warnings.append(
-                            "Unverifiable metadata was rejected; missing fields remain unknown."
-                        )
-                    evaluation.facts = valid
-                    if len(selected) < len(s.pages):
-                        evaluation.warnings.append(
-                            f"Evaluation covers the first {len(selected)} pages only. Evidence extraction covers all readable pages."
-                        )
-                    s.evaluation = evaluation
-                    self.repo.save(p)
-                if not s.evidence_done or force:
-                    batches, batch, length = [], [], 0
-                    for page in s.pages:
-                        if batch and length + len(page.text) > 80000:
-                            batches.append(batch)
-                            batch, length = [], 0
-                        batch.append(page)
-                        length += len(page.text)
-                    if batch:
-                        batches.append(batch)
-                    extracted, rejected, seen = [], 0, set()
-                    for pages in batches:
-                        result = self.ai.extract_evidence(p.context, pages)
-                        for item in result.items:
-                            key = (item.page, normalize(item.quote), item.kind)
-                            if not grounded(pages, item.page, item.quote):
-                                rejected += 1
-                            elif key not in seen:
-                                # Do not let a paraphrase add statistical or temporal claims
-                                # that the verified quotation does not establish.
-                                if normalize(item.content) not in normalize(item.quote):
-                                    if len(item.quote) > 4000:
-                                        rejected += 1
-                                        continue
-                                    item.content = item.quote
-                                extracted.append(Evidence(**item.model_dump(), source_id=s.id))
-                                seen.add(key)
-                    s.evidence, s.evidence_done = extracted, True
-                    if rejected:
-                        s.warnings.append(f"{rejected} ungrounded evidence items were rejected.")
-                    invalidate_reports(p)
-                s.status, s.error = ("ready" if s.evidence else "partial"), None
-                self.record(p, f"Evaluated {s.filename}; {len(s.evidence)} verified quotations")
-            except AppError as exc:
-                s.status, s.error = "partial" if s.evaluation else "failed", exc.message
+            self._process_source(p, s, force)
+
+    def _process_source(self, p, s, force=False):
+        """Process a source inside an existing project lease.
+
+        It is shared by the topic check and the legacy source action so both
+        paths produce exactly the same verified evidence and invalidation rules.
+        """
+        if force:
+            s.evaluation = None
+            s.evidence_done = False
+        if s.evaluation and s.evidence_done and not force:
+            return
+        try:
+            if not s.evaluation or force:
+                selected, length = [], 0
+                for page in s.pages:
+                    if length + len(page.text) > 80000:
+                        break
+                    selected.append(page)
+                    length += len(page.text)
+                evaluation = self.ai.evaluate_source(p.context, selected)
+                valid = [
+                    f
+                    for f in evaluation.facts
+                    if grounded(selected, f.page, f.quote)
+                    and normalize(f.value).lower() in normalize(f.quote).lower()
+                ]
+                if len(valid) != len(evaluation.facts):
+                    evaluation.warnings.append("Unverifiable metadata was rejected; missing fields remain unknown.")
+                evaluation.facts = valid
+                if len(selected) < len(s.pages):
+                    evaluation.warnings.append(
+                        f"Evaluation covers the first {len(selected)} pages only. Evidence extraction covers all readable pages."
+                    )
+                s.evaluation = evaluation
                 self.repo.save(p)
-                raise
+            if not s.evidence_done or force:
+                batches, batch, length = [], [], 0
+                for page in s.pages:
+                    if batch and length + len(page.text) > 80000:
+                        batches.append(batch)
+                        batch, length = [], 0
+                    batch.append(page)
+                    length += len(page.text)
+                if batch:
+                    batches.append(batch)
+                extracted, rejected, seen = [], 0, set()
+                for pages in batches:
+                    result = self.ai.extract_evidence(p.context, pages)
+                    for item in result.items:
+                        key = (item.page, normalize(item.quote), item.kind)
+                        if not grounded(pages, item.page, item.quote):
+                            rejected += 1
+                        elif key not in seen:
+                            if normalize(item.content) not in normalize(item.quote):
+                                if len(item.quote) > 4000:
+                                    rejected += 1
+                                    continue
+                                item.content = item.quote
+                            extracted.append(Evidence(**item.model_dump(), source_id=s.id))
+                            seen.add(key)
+                s.evidence, s.evidence_done = extracted, True
+                if rejected:
+                    s.warnings.append(f"{rejected} ungrounded evidence items were rejected.")
+                invalidate_reports(p)
+            s.status, s.error = ("ready" if s.evidence else "partial"), None
+            self.record(p, f"Evaluated {s.filename}; {len(s.evidence)} verified quotations")
+        except AppError as exc:
+            s.status, s.error = "partial" if s.evaluation else "failed", exc.message
+            self.repo.save(p)
+            raise
 
     def evidence(self, p):
         return [e for s in p.sources for e in s.evidence]
@@ -584,6 +604,68 @@ class WorkspaceService:
                 )
                 self.repo.save(p)
                 raise
+
+    def export_draft_review(self, owner, pid, did):
+        """Return a Word document with PaperFlow comments anchored to claims.
+
+        The original prose remains editable. Comments ask evidence-aware review
+        questions; they do not rewrite or label the author's new contribution as
+        correct or incorrect.
+        """
+        from io import BytesIO
+
+        from docx import Document
+        from docx.enum.text import WD_COLOR_INDEX
+
+        p = self.repo.get(owner, pid)
+        draft = next((item for item in p.drafts if item.id == did), None)
+        if not draft:
+            raise AppError("Draft not found.", 404)
+        document = Document()
+        document.add_heading(draft.title, level=1)
+        document.add_paragraph("PaperFlow evidence review — comments are prompts for the author's judgment.")
+        source_names = {source.id: source.filename for source in p.sources}
+        claims = sorted(draft.claims, key=lambda item: len(item.text), reverse=True)
+        for block in draft.text.splitlines() or [draft.text]:
+            paragraph = document.add_paragraph()
+            cursor = 0
+            for claim in claims:
+                start = block.find(claim.text, cursor)
+                if start < 0:
+                    continue
+                if start > cursor:
+                    paragraph.add_run(block[cursor:start])
+                run = paragraph.add_run(claim.text)
+                run.font.highlight_color = WD_COLOR_INDEX.YELLOW
+                check = claim.check
+                if check:
+                    matches = []
+                    for match in check.matches[:2]:
+                        evidence = next((item for item in self.evidence(p) if item.id == match.evidence_id), None)
+                        if evidence:
+                            matches.append(f"{source_names.get(evidence.source_id, 'Source')}, p. {evidence.page}")
+                    question = self.review_question(claim.text, check.status, bool(matches))
+                    reference = " Evidence to inspect: " + "; ".join(matches) + "." if matches else ""
+                    document.add_comment([run], question + reference, author="PaperFlow", initials="PF")
+                cursor = start + len(claim.text)
+            if cursor < len(block):
+                paragraph.add_run(block[cursor:])
+        output = BytesIO()
+        document.save(output)
+        return output.getvalue()
+
+    @staticmethod
+    def review_question(claim, status, has_matches):
+        subject = claim[:180].rstrip(". ")
+        if status == Support.SUPPORTED:
+            return f"Does the cited evidence support ‘{subject}’ under the same scope and conditions used here?"
+        if status == Support.PARTIALLY_SUPPORTED:
+            return f"Which scope, population, or condition should qualify ‘{subject}’ so the wording matches the available evidence?"
+        if status == Support.CONTRADICTED:
+            return f"How will you address the evidence that points in a different direction before retaining ‘{subject}’?"
+        if has_matches:
+            return f"Do these sources establish ‘{subject}’, or do they only provide context for a further argument of your own?"
+        return f"Is ‘{subject}’ a conclusion that needs a source, or should you state it as a question or a clearly bounded contribution of this paper?"
 
     def notes(self, query):
         return self.repo.notes(query)

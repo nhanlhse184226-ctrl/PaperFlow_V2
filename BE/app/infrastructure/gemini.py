@@ -138,16 +138,18 @@ class GeminiAiProvider:
                         502,
                     ) from None
 
-    def analyze_topic(self, context):
+    def analyze_topic(self, context, evidence):
         return self._run(
-            "Assess all six distinct readiness dimensions. Suggest refinements/directions and keywords. Mark unprovided resources unknown; do not claim to have searched literature. "
+            "Assess all six distinct readiness dimensions using ONLY the supplied, verified evidence from uploaded PDFs. "
+            "The source readiness and data readiness dimensions must describe what these documents actually provide; never use generic statements about qualitative or quantitative research. "
+            "Do not claim that an unsupplied fact is established, and do not invent a research gap. Suggest refinements/directions and keywords grounded in the supplied material. "
             + (
                 "Write ALL free-text values in Vietnamese. "
                 if context.output_language == "vi"
                 else "Write ALL free-text values in English. "
             )
             + "Keep schema enum values unchanged.",
-            context.model_dump(),
+            {"topic": context.model_dump(), "evidence": [item.model_dump() for item in evidence]},
             TopicAnalysis,
         )
 

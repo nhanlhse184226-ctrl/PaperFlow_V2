@@ -1,5 +1,5 @@
-import { useEffect, useState } from "react";
-import { ArrowRight, Check, Compass, Sparkles } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
+import { ArrowRight, Check, Compass, FileText, Sparkles, Upload, X } from "lucide-react";
 import { api } from "../../api";
 import { Badge, Empty, TextList, Notice, message } from "../../ui";
 import { useLanguage } from "../../i18n";
@@ -8,6 +8,7 @@ import type { Analysis, Context, WorkspaceProps } from "../../types";
 const pendingTranslations = new Map<string, Promise<Analysis>>();
 export default function Topic({ p, run, busy, base }: WorkspaceProps) {
   const language = useLanguage();
+  const file = useRef<HTMLInputElement>(null);
   const [translation, setTranslation] = useState<{
     key: string;
     analysis: Analysis;
@@ -54,6 +55,16 @@ export default function Topic({ p, run, busy, base }: WorkspaceProps) {
     setContext((c) => ({ ...c, [key]: value }));
   const save = () =>
     api(base + "/topic", "PUT", { ...context, output_language: language });
+  async function upload(files: FileList | null) {
+    if (!files?.length) return;
+    await run("Uploading research documents", async () => {
+      for (const item of Array.from(files)) {
+        const form = new FormData();
+        form.append("file", item);
+        await api(base + "/sources", "POST", form);
+      }
+    });
+  }
   return (
     <div className="topic-layout">
       <section className="panel">
@@ -61,9 +72,6 @@ export default function Topic({ p, run, busy, base }: WorkspaceProps) {
           <h2>Shape your research question</h2>
           <Compass size={22} />
         </div>
-        <p className="muted">
-          Start with what you know. Uncertainty is a useful part of the process.
-        </p>
         <form
           onSubmit={(e) => {
             e.preventDefault();
@@ -91,27 +99,20 @@ export default function Topic({ p, run, busy, base }: WorkspaceProps) {
                 placeholder="Describe the idea, who it affects, and why it interests you."
               />
             </label>
-            <div className="form-grid">
-              <label>
-                Team size
-                <input
-                  type="number"
-                  min={1}
-                  max={100}
-                  value={context.team_size}
-                  onChange={(e) => change("team_size", Number(e.target.value))}
-                />
-              </label>
-              <label>
-                Timeline
-                <input
-                  maxLength={1000}
-                  value={context.timeline}
-                  onChange={(e) => change("timeline", e.target.value)}
-                  placeholder="e.g. 12 weeks"
-                />
-              </label>
+            <label>
+              Research PDFs
+              <span className="field-hint">At least one readable PDF is required. The check reads the documents before evaluating source and data readiness.</span>
+            </label>
+            <div className="topic-upload" onDragOver={(e) => e.preventDefault()} onDrop={(e) => { e.preventDefault(); if (!busy) void upload(e.dataTransfer.files); }}>
+              <button type="button" className="primary" onClick={() => file.current?.click()} disabled={busy}><Upload size={16} /> Add PDFs</button>
+              <span>or drop them here</span>
+              <input ref={file} className="visually-hidden" type="file" accept="application/pdf,.pdf" multiple aria-label="Upload research PDFs" onChange={(e) => { void upload(e.target.files); e.target.value = ""; }} />
             </div>
+            {p.sources.length > 0 && (
+              <ul className="topic-documents" aria-label="Uploaded research documents">
+                {p.sources.map((source) => <li key={source.id}><FileText size={16} /><span>{source.filename}</span><small>{source.page_count} pages</small><button type="button" className="icon-button" aria-label={`Remove ${source.filename}`} disabled={busy} onClick={() => void run("Removing document", () => api(base + "/sources/" + source.id, "DELETE"))}><X size={16} /></button></li>)}
+              </ul>
+            )}
             <details className="context-details">
               <summary>
                 Add more research context <span>Optional, but helpful</span>
@@ -122,8 +123,6 @@ export default function Topic({ p, run, busy, base }: WorkspaceProps) {
                   ["objectives", "Objectives"],
                   ["questions", "Research questions"],
                   ["skills", "Team skills"],
-                  ["sources", "Available sources / source readiness"],
-                  ["datasets", "Datasets / data readiness"],
                   ["constraints", "Technical and project constraints"],
                 ] as [keyof Context, string][]
               ).map(([key, label]) => (
@@ -149,9 +148,7 @@ export default function Topic({ p, run, busy, base }: WorkspaceProps) {
               <button
                 type="button"
                 className="primary"
-                disabled={
-                  context.title.trim().length < 3 || context.team_size < 1
-                }
+                disabled={context.title.trim().length < 3 || !p.sources.some((source) => source.page_count > 0)}
                 onClick={() =>
                   void run("Analyzing topic readiness", async () => {
                     await save();
@@ -162,7 +159,7 @@ export default function Topic({ p, run, busy, base }: WorkspaceProps) {
                 }
               >
                 <Sparkles size={16} />
-                {p.analysis ? "Reanalyze topic" : "Check direction"}
+                {p.analysis ? "Check direction again" : "Check direction"}
               </button>
             </div>
           </fieldset>

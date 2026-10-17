@@ -338,6 +338,14 @@ def create_router(service, auth, settings, billing=None, feedback=None):
         service.check_draft(oid, pid, did, body.force)
         return {"ok": True}
 
+    @router.get("/projects/{pid}/drafts/{did}/review.docx")
+    def export_draft_review(pid: str, did: str, oid=Depends(owner)):
+        return Response(
+            service.export_draft_review(oid, pid, did),
+            media_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+            headers={"Content-Disposition": 'attachment; filename="paperflow-review.docx"'},
+        )
+
     @router.get("/hub")
     def notes(q: str = "", oid=Depends(owner)):
         return service.notes(q[:200])

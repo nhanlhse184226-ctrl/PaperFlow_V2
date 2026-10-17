@@ -1,4 +1,6 @@
 import sqlite3
+import zipfile
+from io import BytesIO
 
 import pytest
 from fastapi.testclient import TestClient
@@ -26,6 +28,13 @@ def project(client):
     r = client.post("/api/projects", json={"name": "Programming feedback"})
     assert r.status_code == 201
     base = "/api/projects/" + r.json()["id"]
+    # Topic checks are deliberately document-grounded. Uploading here mirrors
+    # the user flow: documents first, then direction analysis and confirmation.
+    uploaded = client.post(
+        base + "/sources",
+        files={"file": ("topic-source.pdf", pdf_bytes(QUOTE), "application/pdf")},
+    )
+    assert uploaded.status_code == 201
     assert client.post(base + "/topic/analyze", json={}).status_code == 200
     assert client.post(base + "/topic/confirm").status_code == 200
     return base
@@ -122,6 +131,19 @@ def test_complete_workflow_and_persistence(setup):
     assert p["drafts"][0]["claims"][0]["check"] is None
 
 
+def test_topic_uses_uploaded_evidence_and_word_export_has_comments(setup):
+    client, ai, _ = setup
+    base = project(client)
+    assert ai.topic_evidence_ids
+    draft_id = client.post(base + "/drafts", json={"title": "Draft", "text": CLAIM}).json()["id"]
+    assert client.post(base + f"/drafts/{draft_id}/check", json={}).status_code == 200
+    exported = client.get(base + f"/drafts/{draft_id}/review.docx")
+    assert exported.status_code == 200
+    with zipfile.ZipFile(BytesIO(exported.content)) as document:
+        assert "word/comments.xml" in document.namelist()
+        assert b"PaperFlow" in document.read("word/comments.xml")
+
+
 def test_matrix_translation_keeps_source_evidence_and_comparison_structure(setup):
     client, ai, app = setup
     base = project(client)
@@ -191,10 +213,11 @@ def test_support_states(setup, mode, status):
 
 def test_no_evidence_is_insufficient(setup):
     client, ai, _ = setup
-    base = project(client)
+    r = client.post("/api/projects", json={"name": "No readable source"})
+    base = "/api/projects/" + r.json()["id"]
+    assert client.post(base + "/topic/analyze", json={}).status_code == 400
     did = client.post(base + "/drafts", json={"title": "Draft", "text": CLAIM}).json()["id"]
-    assert client.post(base + f"/drafts/{did}/check", json={}).status_code == 200
-    assert client.get(base).json()["drafts"][0]["claims"][0]["check"]["status"] == "INSUFFICIENT_EVIDENCE"
+    assert client.post(base + f"/drafts/{did}/check", json={}).status_code == 400
     assert "check" not in ai.calls
 
 
@@ -219,7 +242,7 @@ def test_topic_invalidation(setup):
     p = client.get(base).json()
     assert p["analysis"] is None and not p["confirmed"]
     assert p["sources"][0]["evaluation"] is None
-    assert len(p["sources"][0]["evidence"]) == 1
+    assert p["sources"][0]["evidence"] == []
     assert client.post(base + "/topic/confirm").status_code == 400
 
 
@@ -253,7 +276,7 @@ def test_validation_upload_failures_and_duplicate(setup):
     assert client.post(base + "/sources", files={"file": ("bad.pdf", b"not pdf")}).status_code == 400
     failed = client.post(base + "/sources", files={"file": ("broken.pdf", b"%PDF-broken")})
     assert failed.status_code == 201
-    assert client.get(base).json()["sources"][0]["status"] == "failed"
+    assert next(item for item in client.get(base).json()["sources"] if item["filename"] == "broken.pdf")["status"] == "failed"
     sid = source(client, base)
     duplicate = client.post(base + "/sources", files={"file": ("again.pdf", pdf_bytes())})
     assert duplicate.json()["id"] == sid
@@ -334,6 +357,10 @@ def test_missing_configuration_is_actionable_api_error(tmp_path):
             "/api/auth/register", json={"email": "no-key@example.edu", "password": "a long test password"}
         )
         pid = client.post("/api/projects", json={"name": "A saved topic"}).json()["id"]
+        assert client.post(
+            f"/api/projects/{pid}/sources",
+            files={"file": ("source.pdf", pdf_bytes(), "application/pdf")},
+        ).status_code == 201
         response = client.post(f"/api/projects/{pid}/topic/analyze", json={})
         assert response.status_code == 503
         assert "GEMINI_API_KEY" in response.json()["message"]
@@ -358,7 +385,10 @@ def test_production_requires_secure_cookie(tmp_path):
 def test_resume_extraction_reuses_successful_evaluation(setup):
     client, ai, _ = setup
     base = project(client)
-    response = client.post(base + "/sources", files={"file": ("paper.pdf", pdf_bytes(), "application/pdf")})
+    response = client.post(
+        base + "/sources",
+        files={"file": ("paper.pdf", pdf_bytes(QUOTE + " A second source."), "application/pdf")},
+    )
     sid = response.json()["id"]
     normal = ai.extract_evidence
     ai.extract_evidence = lambda *args: (_ for _ in ()).throw(AppError("Temporary failure", 503))

@@ -38,6 +38,11 @@ test("connected research workflow, provenance, persistence, and responsive UI", 
     .fill(
       "Explore how guided feedback affects student programming performance.",
     );
+  await page.getByLabel("Upload research PDFs").setInputFiles({
+    name: "feedback-study.pdf",
+    mimeType: "application/pdf",
+    buffer: readFileSync("../artifacts/test-source.pdf"),
+  });
   await page
     .getByRole("button", { name: "Check direction", exact: true })
     .click();
@@ -49,18 +54,6 @@ test("connected research workflow, provenance, persistence, and responsive UI", 
     .click();
   await expect(
     page.getByRole("button", { name: "Research direction confirmed" }),
-  ).toBeVisible();
-  await page.getByRole("link", { name: "Sources", exact: true }).click();
-  await page.getByLabel("Upload research PDFs").setInputFiles({
-    name: "feedback-study.pdf",
-    mimeType: "application/pdf",
-    buffer: readFileSync("../artifacts/test-source.pdf"),
-  });
-  await page
-    .getByRole("button", { name: "Evaluate & extract", exact: true })
-    .click();
-  await expect(
-    page.getByRole("button", { name: "Reprocess", exact: true }),
   ).toBeVisible();
   await page
     .getByRole("link", { name: "Evidence matrix", exact: true })
@@ -82,19 +75,8 @@ test("connected research workflow, provenance, persistence, and responsive UI", 
   await page
     .getByRole("button", { name: "Check evidence", exact: true })
     .click();
-  await expect(
-    page.getByRole("heading", {
-      name: "Guided feedback improves student programming performance.",
-    }),
-  ).toBeVisible();
-  await page
-    .getByRole("button")
-    .filter({
-      has: page.getByRole("heading", {
-        name: "Guided feedback improves student programming performance.",
-      }),
-    })
-    .click();
+  await expect(page.getByText("Comments", { exact: true })).toBeVisible();
+  await page.getByRole("button", { name: /Does the evidence support/ }).click();
   await expect(
     page.getByRole("heading", { name: "Claim evidence review" }),
   ).toBeVisible();
@@ -107,11 +89,7 @@ test("connected research workflow, provenance, persistence, and responsive UI", 
   });
   await page.getByRole("button", { name: "Close dialog" }).click();
   await page.reload();
-  await expect(
-    page.getByRole("heading", {
-      name: "Guided feedback improves student programming performance.",
-    }),
-  ).toBeVisible();
+  await expect(page.getByText("Comments", { exact: true })).toBeVisible();
   await page.setViewportSize({ width: 390, height: 844 });
   await expect(page.locator(".sidebar")).not.toBeVisible();
   await page.screenshot({

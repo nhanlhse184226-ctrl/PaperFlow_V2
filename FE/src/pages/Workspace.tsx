@@ -12,7 +12,6 @@ import { Badge, Notice, Modal, message } from "../ui";
 import type { Evidence, Project } from "../types";
 import Overview from "./workspace/Overview";
 import Topic from "./workspace/Topic";
-import Sources from "./workspace/Sources";
 import Matrix from "./workspace/Matrix";
 import Essay from "./workspace/Essay";
 export default function Workspace() {
@@ -90,7 +89,6 @@ function ProjectWorkspace() {
   const tabs = [
     ["overview", "Overview"],
     ["topic", "Topic direction"],
-    ["sources", "Sources"],
     ["evidence", "Evidence matrix"],
     ["essay", "Essay check"],
   ];
@@ -155,7 +153,7 @@ function ProjectWorkspace() {
       ) : tab === "topic" ? (
         <Topic {...props} />
       ) : tab === "sources" ? (
-        <Sources {...props} />
+        <Navigate to={base + "/topic"} replace />
       ) : tab === "evidence" ? (
         <Matrix {...props} />
       ) : tab === "essay" ? (

@@ -1,7 +1,7 @@
 from fastapi.testclient import TestClient
 
 from app.main import Settings, create_app
-from tests.fakes import FakeAi
+from tests.fakes import FakeAi, pdf_bytes
 
 
 def register(client, email, password="correct horse battery"):
@@ -11,6 +11,10 @@ def register(client, email, password="correct horse battery"):
 def ready_project(client):
     pid = client.post("/api/projects", json={"name": "Feedback project"}).json()["id"]
     base = f"/api/projects/{pid}"
+    assert client.post(
+        base + "/sources",
+        files={"file": ("feedback.pdf", pdf_bytes(), "application/pdf")},
+    ).status_code == 201
     assert client.post(base + "/topic/analyze", json={}).status_code == 200
     return pid, base
 

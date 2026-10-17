@@ -44,8 +44,9 @@ class FakeAi:
         self.calls = []
         self.mode = "supported"
 
-    def analyze_topic(self, context):
+    def analyze_topic(self, context, evidence):
         self.calls.append("topic")
+        self.topic_evidence_ids = [item.id for item in evidence]
         return TopicAnalysis(
             summary="A focused question needs an available dataset.",
             dimensions=[

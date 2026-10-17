@@ -22,16 +22,12 @@ export default function Overview({
         "Evaluate your idea and confirm a focused, feasible topic.",
       ]
     : !p.sources.length
-      ? [
-          "sources",
-          "Bring your sources together",
-          "Upload research PDFs to evaluate their relevance.",
-        ]
+      ? ["topic", "Add your documents", "Upload the PDFs that should inform your direction."]
       : p.sources.some((s) => !s.evaluation || !s.evidence_done)
         ? [
-            "sources",
-            "Get to know your sources",
-            "Process your sources to build a grounded evidence library.",
+            "topic",
+            "Check your documents",
+            "Read the PDFs and build a verified evidence library.",
           ]
         : !evidence.length
           ? [
@@ -63,10 +59,9 @@ export default function Overview({
           <ArrowRight size={17} />
         </Link>
       </section>
-      <div className="metrics">
+      <div className="metrics overview-metrics">
         {[
           ["Sources", p.sources.length],
-          ["Evaluated sources", p.sources.filter((s) => s.evaluation).length],
           ["Evidence items", evidence.length],
           ["Checked drafts", checked],
         ].map(([name, n]) => (
@@ -76,15 +71,15 @@ export default function Overview({
           </div>
         ))}
       </div>
-      <div className="two-columns">
+      <div className="two-columns overview-secondary">
         <section className="panel">
           <h2>Your research path</h2>
           {[
             ["Topic direction", p.confirmed, "topic"],
             [
-              "Source evaluation",
+              "Documents",
               p.sources.length > 0 && p.sources.every((s) => s.evaluation),
-              "sources",
+              "topic",
             ],
             ["Evidence matrix", evidence.length > 0, "evidence"],
             ["Essay evidence check", checked > 0, "essay"],

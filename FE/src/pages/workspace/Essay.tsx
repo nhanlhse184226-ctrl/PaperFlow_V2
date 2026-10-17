@@ -1,8 +1,8 @@
 import { useEffect, useRef, useState } from "react";
+import type { ReactNode } from "react";
 import {
   ArrowRight,
   Check,
-  ChevronRight,
   FileCheck2,
   FileText,
   Plus,
@@ -10,7 +10,7 @@ import {
   Sparkles,
   Upload,
 } from "lucide-react";
-import { api } from "../../api";
+import { api, apiUrl } from "../../api";
 import { useLanguage } from "../../i18n";
 import { Badge, Empty, Notice, Modal, readable } from "../../ui";
 import type { Claim, Draft, WorkspaceProps } from "../../types";
@@ -249,6 +249,11 @@ export default function Essay({ p, run, busy, base, inspect }: WorkspaceProps) {
                   ? "Run a new check"
                   : "Check evidence"}
               </button>
+              {draft.claims.length > 0 && (
+                <a className="button" href={apiUrl(base + "/drafts/" + draft.id + "/review.docx")}>
+                  Export Word comments
+                </a>
+              )}
             </div>
           </section>
           {draft.error && <Notice>{draft.error}</Notice>}
@@ -277,41 +282,22 @@ export default function Essay({ p, run, busy, base, inspect }: WorkspaceProps) {
                 Coverage counts refer to extracted claims, not every sentence in
                 your draft. Up to 40 claims are analyzed per draft.
               </p>
-              <div className="claims-list">
-                {draft.claims.map((c, i) => (
-                  <button
-                    className="claim-card"
-                    key={c.id}
-                    onClick={() => setClaim(c)}
-                  >
-                    <span className="claim-number">
-                      {String(i + 1).padStart(2, "0")}
-                    </span>
-                    <div>
-                      <Badge
-                        tone={
-                          c.check?.status === "SUPPORTED"
-                            ? "good"
-                            : c.check?.status === "CONTRADICTED"
-                              ? "bad"
-                              : "warm"
-                        }
-                      >
-                        {c.check ? readable(c.check.status) : "Awaiting check"}
-                      </Badge>
-                      <h3>{c.text}</h3>
-                      <p>
-                        {c.check?.action ||
-                          "Continue the check to analyze this claim."}
-                      </p>
-                      <small>
-                        {c.check?.matches.length || 0} evidence connections
-                      </small>
-                    </div>
-                    <ChevronRight size={19} />
-                  </button>
-                ))}
-              </div>
+              <section className="essay-review" aria-label="Annotated draft review">
+                <article className="essay-paper">
+                  {draft.text.split(/\n{2,}/).map((paragraph, paragraphIndex) => (
+                    <p key={paragraphIndex}>{renderAnnotatedText(paragraph, draft.claims, setClaim)}</p>
+                  ))}
+                </article>
+                <aside className="comment-rail" aria-label="Review comments">
+                  <h3>Comments</h3>
+                  {draft.claims.map((item, index) => (
+                    <button key={item.id} className="comment-card" onClick={() => setClaim(item)}>
+                      <span>{index + 1}</span>
+                      <div><Badge tone={item.check?.status === "SUPPORTED" ? "good" : item.check?.status === "CONTRADICTED" ? "bad" : "warm"}>{item.check ? readable(item.check.status) : "Awaiting check"}</Badge><p>{reviewQuestion(item)}</p></div>
+                    </button>
+                  ))}
+                </aside>
+              </section>
               <AiFeedback module="essay_evidence_check" projectId={p.id} resultId={draft.id} />
             </>
           ) : (
@@ -405,4 +391,30 @@ export default function Essay({ p, run, busy, base, inspect }: WorkspaceProps) {
       )}
     </>
   );
+}
+
+function renderAnnotatedText(text: string, claims: Claim[], select: (claim: Claim) => void) {
+  const matches = claims
+    .map((claim, index) => ({ claim, index, start: text.indexOf(claim.text) }))
+    .filter((item) => item.start >= 0)
+    .sort((left, right) => left.start - right.start);
+  if (!matches.length) return text;
+  const parts: ReactNode[] = [];
+  let cursor = 0;
+  for (const item of matches) {
+    if (item.start < cursor) continue;
+    if (item.start > cursor) parts.push(text.slice(cursor, item.start));
+    parts.push(<button className="essay-anchor" key={item.claim.id} onClick={() => select(item.claim)}>{item.claim.text}<sup>{item.index + 1}</sup></button>);
+    cursor = item.start + item.claim.text.length;
+  }
+  if (cursor < text.length) parts.push(text.slice(cursor));
+  return parts;
+}
+
+function reviewQuestion(claim: Claim) {
+  const subject = claim.text.length > 130 ? claim.text.slice(0, 127) + "…" : claim.text;
+  if (claim.check?.status === "SUPPORTED") return `Does the evidence support this wording under the same scope?`;
+  if (claim.check?.status === "PARTIALLY_SUPPORTED") return `Which condition or scope would make “${subject}” more precise?`;
+  if (claim.check?.status === "CONTRADICTED") return `How does the evidence pointing elsewhere change this argument?`;
+  return `Is “${subject}” an evidence-backed conclusion, or a question to qualify and investigate further?`;
 }
