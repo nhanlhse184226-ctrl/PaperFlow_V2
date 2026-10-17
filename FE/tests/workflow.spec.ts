@@ -78,7 +78,7 @@ test("connected research workflow, provenance, persistence, and responsive UI", 
     .getByRole("button", { name: "Check evidence", exact: true })
     .click();
   await expect(page.getByText("Comments", { exact: true })).toBeVisible();
-  await page.getByRole("button", { name: /Does the evidence support/ }).click();
+  await page.getByRole("button", { name: /Could this wording name/ }).click();
   await expect(page.locator(".essay-anchor.is-focused")).toHaveCount(1);
   await page.locator(".essay-anchor.is-focused").click();
   await expect(

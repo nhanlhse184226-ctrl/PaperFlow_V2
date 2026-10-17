@@ -11,7 +11,7 @@ import {
 } from "lucide-react";
 import { api, apiUrl } from "../../api";
 import { useLanguage } from "../../i18n";
-import { Badge, Empty, Notice, Modal, readable } from "../../ui";
+import { Badge, Empty, Notice, Modal } from "../../ui";
 import type { Claim, Draft, WorkspaceProps } from "../../types";
 import AiFeedback from "../../components/AiFeedback";
 
@@ -38,6 +38,7 @@ export default function Essay({ p, run, busy, base, inspect }: WorkspaceProps) {
   const upload = useRef<HTMLInputElement>(null);
   const claimAnchors = useRef<Record<string, HTMLButtonElement | null>>({});
   const language = useLanguage();
+  const statusLabel = (status?: string) => claimStatusLabel(status, language);
   const draft = p.drafts.find((d) => d.id === did) || p.drafts[0];
   // Existing drafts can contain combining Vietnamese marks from a pasted
   // document. Normalize at display time as well as at save time so older
@@ -51,6 +52,9 @@ export default function Essay({ p, run, busy, base, inspect }: WorkspaceProps) {
     claimTranslation && claimTranslation.claimId === activeClaim?.id
       ? claimTranslation.value
       : null;
+  const needsReviewTranslation =
+    !!activeClaim?.check && language !== (p.context.output_language ?? "en");
+  const copy = reviewCopy(language);
   useEffect(() => {
     let current = true;
     if (!draft || !activeClaim?.check) {
@@ -229,9 +233,9 @@ export default function Essay({ p, run, busy, base, inspect }: WorkspaceProps) {
         <>
           <section className="draft-header panel">
             <div>
-              <Badge>{draft.status}</Badge>
+              <Badge>{draftStatusLabel(draft.status, language)}</Badge>
               <h3>{draft.title}</h3>
-              <p>{draft.claims.length} claims to review against your uploaded evidence.</p>
+              <p>{draft.claims.length} {copy.claimsToReview}</p>
             </div>
             <div className="actions">
               <button disabled={busy} onClick={() => edit(draft)}>
@@ -270,15 +274,15 @@ export default function Essay({ p, run, busy, base, inspect }: WorkspaceProps) {
                   ))}
                 </article>
                 <aside className="comment-rail" aria-label="Review comments">
-                  <h3>Comments</h3>
+                  <h3>{copy.comments}</h3>
                   <details className="comment-coverage">
-                    <summary>{draft.claims.length} claims reviewed</summary>
-                    <div>{["SUPPORTED", "PARTIALLY_SUPPORTED", "CONTRADICTED", "UNSUPPORTED", "INSUFFICIENT_EVIDENCE"].map((status) => <span key={status}><strong>{draft.claims.filter((c) => c.check?.status === status).length}</strong> {readable(status)}</span>)}</div>
+                    <summary>{draft.claims.length} {copy.claimsReviewed}</summary>
+                    <div>{["SUPPORTED", "PARTIALLY_SUPPORTED", "CONTRADICTED", "UNSUPPORTED", "INSUFFICIENT_EVIDENCE"].map((status) => <span key={status}><strong>{draft.claims.filter((c) => c.check?.status === status).length}</strong> {statusLabel(status)}</span>)}</div>
                   </details>
                   {draft.claims.map((item, index) => (
                     <button key={item.id} className={highlightedClaimId === item.id ? "comment-card active" : "comment-card"} onClick={() => focusClaim(item)}>
                       <span>{index + 1}</span>
-                      <div><Badge tone={item.check?.status === "SUPPORTED" ? "good" : item.check?.status === "CONTRADICTED" ? "bad" : "warm"}>{item.check ? readable(item.check.status) : "Awaiting check"}</Badge><p>{reviewQuestion(item)}</p></div>
+                      <div><Badge tone={item.check?.status === "SUPPORTED" ? "good" : item.check?.status === "CONTRADICTED" ? "bad" : "warm"}>{statusLabel(item.check?.status)}</Badge><p>{reviewQuestion(item, language)}</p></div>
                     </button>
                   ))}
                 </aside>
@@ -312,7 +316,7 @@ export default function Essay({ p, run, busy, base, inspect }: WorkspaceProps) {
         </Empty>
       )}
       {activeClaim && (
-        <Modal wide title="Claim evidence review" close={() => setClaim(null)}>
+        <Modal wide title={copy.reviewTitle} close={() => setClaim(null)}>
           <h3>{activeClaim.text}</h3>
           {activeClaim.check ? (
             <>
@@ -321,20 +325,20 @@ export default function Essay({ p, run, busy, base, inspect }: WorkspaceProps) {
                   activeClaim.check.status === "SUPPORTED" ? "good" : "warm"
                 }
               >
-                {readable(activeClaim.check.status)}
+                {statusLabel(activeClaim.check.status)}
               </Badge>
-              <p>{reviewTranslation?.explanation || activeClaim.check.explanation}</p>
+              <p>{localizedReviewText(reviewTranslation?.explanation, activeClaim.check.explanation, needsReviewTranslation, copy.translatingReview)}</p>
               <div className="evaluation-block">
-                <h4>Topic relevance</h4>
-                <p>{reviewTranslation?.relevance || activeClaim.check.relevance}</p>
-                <h4>Citation coverage</h4>
-                <p>{reviewTranslation?.citation_issue || activeClaim.check.citation_issue}</p>
-                <h4>Evidence limitations</h4>
-                <p>{reviewTranslation?.limitation || activeClaim.check.limitation}</p>
-                <h4>Recommended action</h4>
-                <p>{reviewTranslation?.action || activeClaim.check.action}</p>
+                <h4>{copy.topicRelevance}</h4>
+                <p>{localizedReviewText(reviewTranslation?.relevance, activeClaim.check.relevance, needsReviewTranslation, copy.translatingReview)}</p>
+                <h4>{copy.citationCoverage}</h4>
+                <p>{localizedReviewText(reviewTranslation?.citation_issue, activeClaim.check.citation_issue, needsReviewTranslation, copy.translatingReview)}</p>
+                <h4>{copy.evidenceLimitations}</h4>
+                <p>{localizedReviewText(reviewTranslation?.limitation, activeClaim.check.limitation, needsReviewTranslation, copy.translatingReview)}</p>
+                <h4>{copy.recommendedAction}</h4>
+                <p>{localizedReviewText(reviewTranslation?.action, activeClaim.check.action, needsReviewTranslation, copy.translatingReview)}</p>
               </div>
-              <h3 className="subheading">Evidence connections</h3>
+              <h3 className="subheading">{copy.evidenceConnections}</h3>
               {activeClaim.check.matches.length ? (
                 activeClaim.check.matches.map((m, index) => {
                   const e = p.sources
@@ -342,8 +346,8 @@ export default function Essay({ p, run, busy, base, inspect }: WorkspaceProps) {
                     .find((e) => e.id === m.evidence_id);
                   return e ? (
                     <div className="match" key={m.evidence_id}>
-                      <Badge>{m.relation}</Badge>
-                      <p>{reviewTranslation?.matches[index] || m.explanation}</p>
+                      <Badge>{matchLabel(m.relation, language)}</Badge>
+                      <p>{localizedReviewText(reviewTranslation?.matches[index], m.explanation, needsReviewTranslation, copy.translatingReview)}</p>
                       <blockquote>{e.quote}</blockquote>
                       <button
                         className="text-button"
@@ -407,10 +411,89 @@ function renderAnnotatedText(
   return parts;
 }
 
-function reviewQuestion(claim: Claim) {
-  const subject = claim.text.length > 130 ? claim.text.slice(0, 127) + "…" : claim.text;
-  if (claim.check?.status === "SUPPORTED") return `Does the evidence support this wording under the same scope?`;
-  if (claim.check?.status === "PARTIALLY_SUPPORTED") return `Which condition or scope would make “${subject}” more precise?`;
-  if (claim.check?.status === "CONTRADICTED") return `How does the evidence pointing elsewhere change this argument?`;
-  return `Is “${subject}” an evidence-backed conclusion, or a question to qualify and investigate further?`;
+function claimStatusLabel(status: string | undefined, language: "en" | "vi") {
+  const labels = language === "vi"
+    ? {
+        SUPPORTED: "Có bằng chứng liên quan",
+        PARTIALLY_SUPPORTED: "Cần làm rõ phạm vi",
+        CONTRADICTED: "Cần xem xét thêm",
+        UNSUPPORTED: "Cần kiểm tra nguồn",
+        INSUFFICIENT_EVIDENCE: "Cần thêm bằng chứng",
+        pending: "Đang chờ kiểm tra",
+      }
+    : {
+        SUPPORTED: "Related evidence found",
+        PARTIALLY_SUPPORTED: "Scope to clarify",
+        CONTRADICTED: "Needs further review",
+        UNSUPPORTED: "Source to check",
+        INSUFFICIENT_EVIDENCE: "More evidence needed",
+        pending: "Awaiting check",
+      };
+  return labels[status as keyof typeof labels] || labels.pending;
+}
+
+function draftStatusLabel(status: string, language: "en" | "vi") {
+  const labels = language === "vi"
+    ? { saved: "Đã lưu", checked: "Đã kiểm tra", partial: "Đã kiểm tra một phần", failed: "Chưa kiểm tra được" }
+    : { saved: "Saved", checked: "Checked", partial: "Partially checked", failed: "Check unavailable" };
+  return labels[status as keyof typeof labels] || status;
+}
+
+function localizedReviewText(
+  translated: string | undefined,
+  original: string,
+  needsTranslation: boolean,
+  loadingText: string,
+) {
+  return needsTranslation ? translated || loadingText : original;
+}
+
+function reviewCopy(language: "en" | "vi") {
+  return language === "vi"
+    ? {
+        comments: "Nhận xét",
+        claimsToReview: "luận điểm cần xem xét cùng bằng chứng đã tải lên.",
+        claimsReviewed: "luận điểm đã kiểm tra",
+        reviewTitle: "Đánh giá bằng chứng cho luận điểm",
+        topicRelevance: "Mức độ liên quan đến chủ đề",
+        citationCoverage: "Mức độ bao phủ trích dẫn",
+        evidenceLimitations: "Giới hạn của bằng chứng",
+        recommendedAction: "Hành động đề xuất",
+        evidenceConnections: "Các liên kết bằng chứng",
+        translatingReview: "Đang dịch nhận xét…",
+      }
+    : {
+        comments: "Comments",
+        claimsToReview: "claims to review against your uploaded evidence.",
+        claimsReviewed: "claims reviewed",
+        reviewTitle: "Claim evidence review",
+        topicRelevance: "Topic relevance",
+        citationCoverage: "Citation coverage",
+        evidenceLimitations: "Evidence limitations",
+        recommendedAction: "Recommended action",
+        evidenceConnections: "Evidence connections",
+        translatingReview: "Translating review…",
+      };
+}
+
+function matchLabel(relation: string, language: "en" | "vi") {
+  const labels = language === "vi"
+    ? { supporting: "Liên hệ hỗ trợ", partial: "Liên hệ một phần", contradictory: "Liên hệ khác biệt", context: "Ngữ cảnh" }
+    : { supporting: "Supporting connection", partial: "Partial connection", contradictory: "Different evidence", context: "Context" };
+  return labels[relation as keyof typeof labels] || relation;
+}
+
+function reviewQuestion(claim: Claim, language: "en" | "vi") {
+  if (language === "vi") {
+    if (claim.check?.status === "SUPPORTED") return "Luận điểm này có cần nêu rõ bối cảnh, nhóm đối tượng hoặc điều kiện để diễn đạt chính xác hơn không?";
+    if (claim.check?.status === "PARTIALLY_SUPPORTED") return "Bối cảnh, điều kiện hoặc ngoại lệ nào nên được nêu thêm để luận điểm chính xác hơn?";
+    if (claim.check?.status === "CONTRADICTED") return "Có cách giải thích khác hoặc giới hạn nào nên được thừa nhận trước khi giữ cách diễn đạt này không?";
+    if (claim.check?.status === "UNSUPPORTED") return "Nguồn, lập luận hoặc lưu ý nào sẽ giúp người đọc đánh giá luận điểm này đầy đủ hơn?";
+    return "Có nên trình bày đây như một diễn giải thận trọng hoặc câu hỏi nghiên cứu cho đến khi có thêm cơ sở không?";
+  }
+  if (claim.check?.status === "SUPPORTED") return "Could this wording name its context, group, or condition more precisely?";
+  if (claim.check?.status === "PARTIALLY_SUPPORTED") return "Which context, condition, or exception would make this claim more precise?";
+  if (claim.check?.status === "CONTRADICTED") return "Could an alternative interpretation or limitation be acknowledged before keeping this wording?";
+  if (claim.check?.status === "UNSUPPORTED") return "What source, reasoning, or qualification would help the reader assess this claim more fully?";
+  return "Would framing this as a tentative interpretation or research question better reflect its current support?";
 }
