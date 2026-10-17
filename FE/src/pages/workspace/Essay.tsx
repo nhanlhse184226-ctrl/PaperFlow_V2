@@ -38,6 +38,10 @@ export default function Essay({ p, run, busy, base, inspect }: WorkspaceProps) {
   const upload = useRef<HTMLInputElement>(null);
   const language = useLanguage();
   const draft = p.drafts.find((d) => d.id === did) || p.drafts[0];
+  // Existing drafts can contain combining Vietnamese marks from a pasted
+  // document. Normalize at display time as well as at save time so older
+  // drafts render consistently.
+  const displayDraftText = draft?.text.normalize("NFC") || "";
   const activeClaim = draft?.claims.find((c) => c.id === claim?.id);
   const claimTranslationKey = activeClaim?.check
     ? JSON.stringify(activeClaim.check)
@@ -284,7 +288,7 @@ export default function Essay({ p, run, busy, base, inspect }: WorkspaceProps) {
               </p>
               <section className="essay-review" aria-label="Annotated draft review">
                 <article className="essay-paper">
-                  {draft.text.split(/\n{2,}/).map((paragraph, paragraphIndex) => (
+                  {displayDraftText.split(/\n{2,}/).map((paragraph, paragraphIndex) => (
                     <p key={paragraphIndex}>{renderAnnotatedText(paragraph, draft.claims, setClaim)}</p>
                   ))}
                 </article>
@@ -318,7 +322,7 @@ export default function Essay({ p, run, busy, base, inspect }: WorkspaceProps) {
           )}
           <details className="panel saved-draft">
             <summary>Read saved draft</summary>
-            <p>{draft.text}</p>
+            <p>{displayDraftText}</p>
           </details>
         </>
       ) : (
@@ -395,7 +399,12 @@ export default function Essay({ p, run, busy, base, inspect }: WorkspaceProps) {
 
 function renderAnnotatedText(text: string, claims: Claim[], select: (claim: Claim) => void) {
   const matches = claims
-    .map((claim, index) => ({ claim, index, start: text.indexOf(claim.text) }))
+    .map((claim, index) => ({
+      claim,
+      index,
+      text: claim.text.normalize("NFC"),
+      start: text.indexOf(claim.text.normalize("NFC")),
+    }))
     .filter((item) => item.start >= 0)
     .sort((left, right) => left.start - right.start);
   if (!matches.length) return text;
@@ -404,8 +413,8 @@ function renderAnnotatedText(text: string, claims: Claim[], select: (claim: Clai
   for (const item of matches) {
     if (item.start < cursor) continue;
     if (item.start > cursor) parts.push(text.slice(cursor, item.start));
-    parts.push(<button className="essay-anchor" key={item.claim.id} onClick={() => select(item.claim)}>{item.claim.text}<sup>{item.index + 1}</sup></button>);
-    cursor = item.start + item.claim.text.length;
+    parts.push(<button className="essay-anchor" key={item.claim.id} onClick={() => select(item.claim)}>{item.text}<sup>{item.index + 1}</sup></button>);
+    cursor = item.start + item.text.length;
   }
   if (cursor < text.length) parts.push(text.slice(cursor));
   return parts;
