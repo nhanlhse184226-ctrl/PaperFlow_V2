@@ -30,11 +30,13 @@ export default function Essay({ p, run, busy, base, inspect }: WorkspaceProps) {
     [text, setText] = useState(""),
     [editing, setEditing] = useState(!p.drafts.length),
     [claim, setClaim] = useState<Claim | null>(null),
+    [highlightedClaimId, setHighlightedClaimId] = useState(""),
     [claimTranslation, setClaimTranslation] = useState<{
       claimId: string;
       value: ClaimReviewTranslation;
     } | null>(null);
   const upload = useRef<HTMLInputElement>(null);
+  const claimAnchors = useRef<Record<string, HTMLButtonElement | null>>({});
   const language = useLanguage();
   const draft = p.drafts.find((d) => d.id === did) || p.drafts[0];
   // Existing drafts can contain combining Vietnamese marks from a pasted
@@ -98,6 +100,15 @@ export default function Essay({ p, run, busy, base, inspect }: WorkspaceProps) {
     );
     setDid(result.id);
     setEditing(false);
+  }
+  function focusClaim(item: Claim) {
+    setHighlightedClaimId(item.id);
+    window.requestAnimationFrame(() => {
+      claimAnchors.current[item.id]?.scrollIntoView({
+        behavior: "smooth",
+        block: "center",
+      });
+    });
   }
   return (
     <>
@@ -255,7 +266,7 @@ export default function Essay({ p, run, busy, base, inspect }: WorkspaceProps) {
               <section className="essay-review" aria-label="Annotated draft review">
                 <article className="essay-paper">
                   {displayDraftText.split(/\n{2,}/).map((paragraph, paragraphIndex) => (
-                    <p key={paragraphIndex}>{renderAnnotatedText(paragraph, draft.claims, setClaim)}</p>
+                    <p key={paragraphIndex}>{renderAnnotatedText(paragraph, draft.claims, setClaim, highlightedClaimId, (id, element) => { claimAnchors.current[id] = element; })}</p>
                   ))}
                 </article>
                 <aside className="comment-rail" aria-label="Review comments">
@@ -265,7 +276,7 @@ export default function Essay({ p, run, busy, base, inspect }: WorkspaceProps) {
                     <div>{["SUPPORTED", "PARTIALLY_SUPPORTED", "CONTRADICTED", "UNSUPPORTED", "INSUFFICIENT_EVIDENCE"].map((status) => <span key={status}><strong>{draft.claims.filter((c) => c.check?.status === status).length}</strong> {readable(status)}</span>)}</div>
                   </details>
                   {draft.claims.map((item, index) => (
-                    <button key={item.id} className="comment-card" onClick={() => setClaim(item)}>
+                    <button key={item.id} className={highlightedClaimId === item.id ? "comment-card active" : "comment-card"} onClick={() => focusClaim(item)}>
                       <span>{index + 1}</span>
                       <div><Badge tone={item.check?.status === "SUPPORTED" ? "good" : item.check?.status === "CONTRADICTED" ? "bad" : "warm"}>{item.check ? readable(item.check.status) : "Awaiting check"}</Badge><p>{reviewQuestion(item)}</p></div>
                     </button>
@@ -367,7 +378,13 @@ export default function Essay({ p, run, busy, base, inspect }: WorkspaceProps) {
   );
 }
 
-function renderAnnotatedText(text: string, claims: Claim[], select: (claim: Claim) => void) {
+function renderAnnotatedText(
+  text: string,
+  claims: Claim[],
+  select: (claim: Claim) => void,
+  highlightedClaimId: string,
+  register: (id: string, element: HTMLButtonElement | null) => void,
+) {
   const matches = claims
     .map((claim, index) => ({
       claim,
@@ -383,7 +400,7 @@ function renderAnnotatedText(text: string, claims: Claim[], select: (claim: Clai
   for (const item of matches) {
     if (item.start < cursor) continue;
     if (item.start > cursor) parts.push(text.slice(cursor, item.start));
-    parts.push(<button className="essay-anchor" key={item.claim.id} onClick={() => select(item.claim)}>{item.text}<sup>{item.index + 1}</sup></button>);
+    parts.push(<button id={`claim-${item.claim.id}`} ref={(element) => register(item.claim.id, element)} className={highlightedClaimId === item.claim.id ? "essay-anchor is-focused" : "essay-anchor"} key={item.claim.id} onClick={() => select(item.claim)}>{item.text}<sup>{item.index + 1}</sup></button>);
     cursor = item.start + item.text.length;
   }
   if (cursor < text.length) parts.push(text.slice(cursor));
