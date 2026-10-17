@@ -94,12 +94,13 @@ function ProjectWorkspace() {
   ];
   return (
     <main className="page workspace">
-      <div className="breadcrumb">
-        <Link to="/projects">Research projects</Link>
-        <ChevronRight size={13} />
-        <span>{p.name}</span>
-      </div>
-      <div className="page-heading">
+      <div className="workspace-context">
+        <div className="breadcrumb">
+          <Link to="/projects">Research projects</Link>
+          <ChevronRight size={13} />
+          <span>{p.name}</span>
+        </div>
+        <div className="workspace-project-bar">
         <div>
           <div className="eyebrow">RESEARCH WORKSPACE</div>
           <h1>{p.name}</h1>
@@ -115,6 +116,7 @@ function ProjectWorkspace() {
             "Direction in progress"
           )}
         </Badge>
+        </div>
       </div>
       <nav className="project-tabs">
         {tabs.map(([key, label]) => (

@@ -69,7 +69,7 @@ export default function Topic({ p, run, busy, base }: WorkspaceProps) {
     <div className="topic-layout">
       <section className="panel">
         <div className="section-heading">
-          <h2>Shape your research question</h2>
+          <div><h2>Topic direction</h2><p>Describe the question, add the PDFs you will use, then run the evidence-grounded check.</p></div>
           <Compass size={22} />
         </div>
         <form
@@ -113,6 +113,25 @@ export default function Topic({ p, run, busy, base }: WorkspaceProps) {
                 {p.sources.map((source) => <li key={source.id}><FileText size={16} /><span>{source.filename}</span><small>{source.page_count} pages</small><button type="button" className="icon-button" aria-label={`Remove ${source.filename}`} disabled={busy} onClick={() => void run("Removing document", () => api(base + "/sources/" + source.id, "DELETE"))}><X size={16} /></button></li>)}
               </ul>
             )}
+            <div className="topic-actions">
+              <button type="submit">Save context</button>
+              <button
+                type="button"
+                className="primary"
+                disabled={context.title.trim().length < 3 || !p.sources.some((source) => source.page_count > 0)}
+                onClick={() =>
+                  void run("Analyzing topic readiness", async () => {
+                    await save();
+                    await api(base + "/topic/analyze", "POST", {
+                      force: !!p.analysis,
+                    });
+                  })
+                }
+              >
+                <Sparkles size={16} />
+                {p.analysis ? "Check direction again" : "Check direction"}
+              </button>
+            </div>
             <details className="context-details">
               <summary>
                 Add more research context <span>Optional, but helpful</span>
@@ -143,25 +162,6 @@ export default function Topic({ p, run, busy, base }: WorkspaceProps) {
                 </label>
               ))}
             </details>
-            <div className="actions">
-              <button type="submit">Save context</button>
-              <button
-                type="button"
-                className="primary"
-                disabled={context.title.trim().length < 3 || !p.sources.some((source) => source.page_count > 0)}
-                onClick={() =>
-                  void run("Analyzing topic readiness", async () => {
-                    await save();
-                    await api(base + "/topic/analyze", "POST", {
-                      force: !!p.analysis,
-                    });
-                  })
-                }
-              >
-                <Sparkles size={16} />
-                {p.analysis ? "Check direction again" : "Check direction"}
-              </button>
-            </div>
           </fieldset>
         </form>
       </section>
@@ -263,15 +263,14 @@ export default function Topic({ p, run, busy, base }: WorkspaceProps) {
         ) : (
           <Empty
             icon={<Compass size={30} />}
-            title="A direction, not a verdict"
+            title="Direction check"
           >
             <p>
-              Your topic check will explore clarity, scope, feasibility,
-              researchability, source readiness, and data readiness.
+              Add your research PDFs and run the check. The result will use
+              their verified excerpts to assess your direction.
             </p>
             <span className="small-note">
-              Suggestions are based on the context you provide, not a live
-              literature search.
+              It will not replace your research judgment.
             </span>
           </Empty>
         )}

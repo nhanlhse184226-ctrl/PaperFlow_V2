@@ -27,6 +27,17 @@ const vietnamese: Record<string, string> = {
   "Search evidence": "Tìm bằng chứng",
   "Search evidence…": "Tìm bằng chứng…",
   "Evidence type": "Loại bằng chứng",
+  "Issue status / evidence type": "Trạng thái vấn đề / loại bằng chứng",
+  "Problem · being addressed": "Vấn đề · đang được giải quyết",
+  "Problem · still open": "Vấn đề · chưa được giải quyết",
+  "documents read": "tài liệu đã đọc",
+  "verified excerpts": "đoạn trích đã xác minh",
+  "problems being addressed": "vấn đề đang được giải quyết",
+  "problems still open": "vấn đề chưa được giải quyết",
+  "Issues the author is examining or working to resolve.":
+    "Các vấn đề tác giả đang xem xét hoặc tìm cách giải quyết.",
+  "Gaps the document says need further research or action.":
+    "Các khoảng trống mà tài liệu cho biết cần được nghiên cứu hoặc xử lý tiếp.",
   method: "phương pháp",
   finding: "phát hiện",
   problem: "vấn đề",

@@ -6,7 +6,6 @@ import {
   FileCheck2,
   FileText,
   Plus,
-  ShieldCheck,
   Sparkles,
   Upload,
 } from "lucide-react";
@@ -141,13 +140,6 @@ export default function Essay({ p, run, busy, base, inspect }: WorkspaceProps) {
           }}
         />
       </div>
-      <div className="info-banner">
-        <ShieldCheck size={19} />
-        <span>
-          This checks evidence alignment, not writing quality. Assessments use
-          your uploaded sources and need your judgment.
-        </span>
-      </div>
       {p.drafts.length > 0 && (
         <div className="draft-tabs">
           {p.drafts.map((d) => (
@@ -228,10 +220,7 @@ export default function Essay({ p, run, busy, base, inspect }: WorkspaceProps) {
             <div>
               <Badge>{draft.status}</Badge>
               <h3>{draft.title}</h3>
-              <p>
-                {draft.text.length.toLocaleString()} characters ·{" "}
-                {draft.claims.length} extracted claims
-              </p>
+              <p>{draft.claims.length} claims to review against your uploaded evidence.</p>
             </div>
             <div className="actions">
               <button disabled={busy} onClick={() => edit(draft)}>
@@ -263,29 +252,6 @@ export default function Essay({ p, run, busy, base, inspect }: WorkspaceProps) {
           {draft.error && <Notice>{draft.error}</Notice>}
           {draft.claims.length > 0 ? (
             <>
-              <div className="coverage">
-                {[
-                  "SUPPORTED",
-                  "PARTIALLY_SUPPORTED",
-                  "CONTRADICTED",
-                  "UNSUPPORTED",
-                  "INSUFFICIENT_EVIDENCE",
-                ].map((status) => (
-                  <div key={status}>
-                    <strong>
-                      {
-                        draft.claims.filter((c) => c.check?.status === status)
-                          .length
-                      }
-                    </strong>
-                    <span>{readable(status)}</span>
-                  </div>
-                ))}
-              </div>
-              <p className="small-note">
-                Coverage counts refer to extracted claims, not every sentence in
-                your draft. Up to 40 claims are analyzed per draft.
-              </p>
               <section className="essay-review" aria-label="Annotated draft review">
                 <article className="essay-paper">
                   {displayDraftText.split(/\n{2,}/).map((paragraph, paragraphIndex) => (
@@ -294,6 +260,10 @@ export default function Essay({ p, run, busy, base, inspect }: WorkspaceProps) {
                 </article>
                 <aside className="comment-rail" aria-label="Review comments">
                   <h3>Comments</h3>
+                  <details className="comment-coverage">
+                    <summary>{draft.claims.length} claims reviewed</summary>
+                    <div>{["SUPPORTED", "PARTIALLY_SUPPORTED", "CONTRADICTED", "UNSUPPORTED", "INSUFFICIENT_EVIDENCE"].map((status) => <span key={status}><strong>{draft.claims.filter((c) => c.check?.status === status).length}</strong> {readable(status)}</span>)}</div>
+                  </details>
                   {draft.claims.map((item, index) => (
                     <button key={item.id} className="comment-card" onClick={() => setClaim(item)}>
                       <span>{index + 1}</span>
