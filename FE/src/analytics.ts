@@ -12,7 +12,7 @@ export type WebEvent =
   | "begin_checkout"
   | "purchase";
 
-type Gtag = (command: "config" | "event", target: string, params?: Record<string, unknown>) => void;
+type Gtag = (command: "js" | "config" | "event", target: string | Date, params?: Record<string, unknown>) => void;
 type PurchaseItem = { id: string; name: string };
 
 declare global {
@@ -38,6 +38,8 @@ export function initializeAnalytics() {
     // gtag consumes each queued command as an argument tuple.
     window.dataLayer?.push(args);
   } as Gtag;
+  // This is the standard GA4 bootstrap command; it must precede config.
+  window.gtag("js", new Date());
   window.gtag("config", measurementId, { send_page_view: false });
 }
 
