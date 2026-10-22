@@ -41,6 +41,15 @@ export function initializeAnalytics() {
   window.gtag("config", measurementId, { send_page_view: false });
 }
 
+/** Sends the initial public page view without calling the authenticated product ledger. */
+export function trackPublicPageView() {
+  if (!measurementId || !window.gtag) return;
+  window.gtag("event", "page_view", {
+    // Never include PayOS order codes, email addresses, or other query-string data.
+    page_location: `${window.location.origin}${window.location.pathname}`,
+  });
+}
+
 export function trackWebEvent(name: WebEvent, projectId?: string, value?: number, transactionId?: string, item?: PurchaseItem) {
   if (measurementId && window.gtag) {
     // Keep query strings (such as a PayOS return order code) out of GA4.
