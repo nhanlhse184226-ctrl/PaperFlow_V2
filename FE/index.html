@@ -1,1 +1,31 @@
-<!doctype html><html lang="en"><head><meta charset="UTF-8"/><meta name="viewport" content="width=device-width, initial-scale=1.0"/><meta name="theme-color" content="#164d42"/><meta name="description" content="PaperFlow — From vague research topics to citation-backed evidence."/><title>PaperFlow · Research Readiness Workspace</title></head><body><div id="root"></div><script type="module" src="/src/main.tsx"></script></body></html>
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#164d42" />
+    <meta name="description" content="PaperFlow — From vague research topics to citation-backed evidence." />
+    <script>
+      (function () {
+        var measurementId = "%VITE_GA4_MEASUREMENT_ID%";
+        if (!measurementId || measurementId.indexOf("%VITE_") === 0) return;
+        window.dataLayer = window.dataLayer || [];
+        window.gtag = window.gtag || function () { window.dataLayer.push(arguments); };
+        window.gtag("js", new Date());
+        window.gtag("config", measurementId, { send_page_view: false });
+        window.gtag("event", "page_view", {
+          page_location: window.location.origin + window.location.pathname
+        });
+        var tag = document.createElement("script");
+        tag.async = true;
+        tag.src = "https://www.googletagmanager.com/gtag/js?id=" + encodeURIComponent(measurementId);
+        document.head.appendChild(tag);
+      })();
+    </script>
+    <title>PaperFlow · Research Readiness Workspace</title>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>
