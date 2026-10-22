@@ -89,6 +89,7 @@ This starts PaperFlow at **http://localhost:8080** with `AI_PROVIDER=ollama`; it
 | `BOOTSTRAP_ADMIN_EMAIL` / `BOOTSTRAP_ADMIN_PASSWORD` | One-time administrator bootstrap; remove after confirming the account |
 | `PAYOS_CLIENT_ID`, `PAYOS_API_KEY`, `PAYOS_CHECKSUM_KEY` | Server-only PayOS channel credentials |
 | `PAYOS_RETURN_URL`, `PAYOS_CANCEL_URL` | Frontend result page URLs; they never confirm payment |
+| `VITE_GA4_MEASUREMENT_ID` (set in `FE/.env`) | Optional public GA4 Web Measurement ID; Web only, never a secret |
 
 Each new project starts with one PDF and one draft. Starter (39,000 VND) allows 5 PDFs and 1 draft; Research (79,000 VND) allows 15 PDFs and 3 drafts; Pro (99,000 VND) allows 30 PDFs and 20 drafts. Each payment is one-time for its selected project. Existing projects keep their prior unlimited source/draft rights. Upgrades increase limits; the checkout amount is the full displayed package price. Only a signature-verified PayOS webhook activates a purchase. A real bank transfer is required to verify that final activation path end to end.
 
@@ -159,3 +160,12 @@ For an internet deployment, configure an HTTPS reverse proxy on the host in fron
 Back up the **whole** data volume while the backend is stopped (database and PDFs must be consistent), or use SQLite's backup API plus coordinated file snapshots. Test restore before relying on a backup. For a running database, never copy only the `.db` and ignore WAL files. Deployment is not claimed until images are built, started, and tested on the target platform with its own credentials.
 
 See [AGENTS.md](AGENTS.md) for persistent engineering rules and [VALIDATION.md](VALIDATION.md) for the validation actually performed during implementation.
+
+
+## Web Analytics and OC2/OC3
+
+Web analytics is isolated from `mobile/`. Set `VITE_GA4_MEASUREMENT_ID=G-XXXXXXXXXX` in `FE/.env` before building the web client. The frontend adds the GA4 tag only when that value is present and sends non-content events for page views, sign-in, registration, project creation, source upload, topic check, evidence-matrix use, essay check and checkout. Never put PDFs, draft text, quotations, email addresses, account IDs, passwords, or PayOS credentials in GA event parameters.
+
+The backend keeps a separate `web_analytics_events` ledger for authenticated Web activity. It derives the user from the session, validates project ownership, accepts only the event allow-list, and rate-limits events. `/api/admin/*` remains admin-only. The Admin dashboard provides 7/30/90-day activity, new-user, DAU/MAU, feature, PayOS revenue and paid-user metrics. PayOS revenue and paid-user CSV exports include only signature-verified `PAID` orders and exclude `DEMO_GRANT`; they are the evidence source for OC3. GA4 is the evidence source for OC2 visits, source acquisition, and campaign key events.
+
+Existing users deliberately retain a null `created_at`; no historical registration timestamp is invented. New-user trend begins when migration `006_web_analytics.sql` is active. Configure GA4 at **Admin → Data streams → Web**, use `https://www.paperflow.space`, copy its `G-…` Measurement ID into the Web environment, enable only suitable Enhanced Measurement events, and mark `sign_up`, `begin_checkout`, and `purchase` as Key events. Verify with Realtime/DebugView before reporting campaign results.

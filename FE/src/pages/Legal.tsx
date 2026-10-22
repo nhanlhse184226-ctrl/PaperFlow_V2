@@ -34,6 +34,10 @@ const content: Record<
         "PaperFlow uses hosted application, database, and file-storage services to run the workspace, and Google Gemini for requested AI processing. Access is limited to operating the service and resolving support or security issues. We do not sell, advertise with, or publish your research projects or PDFs.",
       ],
       [
+        "Web analytics",
+        "When Web Analytics is enabled, PaperFlow uses Google Analytics only on the website to understand page use, sign-in, registration, and feature actions. We do not send research PDFs, draft text, quotations, prompts, passwords, emails, or account identifiers to Google Analytics. Payment truth remains in PaperFlow’s server records and is not determined by web analytics.",
+      ],
+      [
         "Account deletion",
         "In the mobile app, open Account and choose Delete account. Deletion permanently removes the account and its owned projects, PDFs, Hub notes, feedback, and active sessions. You can also request help at the email below. Deleted data cannot be restored.",
       ],

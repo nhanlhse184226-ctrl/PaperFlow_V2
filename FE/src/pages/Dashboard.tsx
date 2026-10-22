@@ -18,6 +18,7 @@ import { api } from "../api";
 import { Badge, Empty, Notice, Modal, message } from "../ui";
 import type { FormEvent } from "react";
 import type { Summary } from "../types";
+import { trackWebEvent } from "../analytics";
 export default function Dashboard({ all = false }: { all?: boolean }) {
   const [projects, setProjects] = useState<Summary[]>([]),
     [loading, setLoading] = useState(true),
@@ -42,6 +43,7 @@ export default function Dashboard({ all = false }: { all?: boolean }) {
     try {
       const name = new FormData(e.currentTarget).get("name");
       const p = await api<{ id: string }>("/projects", "POST", { name });
+      void trackWebEvent("project_create", p.id);
       navigate("/projects/" + p.id + "/overview");
     } catch (e) {
       setError(message(e));

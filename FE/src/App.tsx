@@ -8,6 +8,7 @@ import Auth from "./auth/Auth";
 import Shell from "./layout/Shell";
 import { LanguageToggle } from "./i18n";
 import Legal, { legalKind } from "./pages/Legal";
+import { initializeAnalytics } from "./analytics";
 export default function App() {
   const [user, setUser] = useState<User | null>(null),
     [loading, setLoading] = useState(true),
@@ -32,6 +33,7 @@ export default function App() {
       .finally(() => setLoading(false));
   }, [legal]);
   useEffect(load, [load]);
+  useEffect(() => { initializeAnalytics(); }, []);
   if (legal) return <Legal kind={legal} />;
   if (loading)
     return (

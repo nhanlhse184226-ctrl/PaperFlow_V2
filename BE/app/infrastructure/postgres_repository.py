@@ -7,6 +7,7 @@ Supabase Postgres.
 
 import json
 import time
+from datetime import datetime, timedelta, timezone
 from contextlib import contextmanager
 from pathlib import Path
 
@@ -222,8 +223,8 @@ class PostgresRepository:
         user_id = uid()
         with self.connect() as db:
             changed = db.execute(
-                "INSERT INTO users (id,email,password_hash,role) VALUES (?,?,?,?) ON CONFLICT (email) DO NOTHING",
-                (user_id, email, password_hash, role),
+                "INSERT INTO users (id,email,password_hash,role,created_at) VALUES (?,?,?,?,?) ON CONFLICT (email) DO NOTHING",
+                (user_id, email, password_hash, role, now()),
             ).rowcount
             if not changed:
                 raise AppError("An account with this email already exists.", 409) from None
@@ -264,6 +265,7 @@ class PostgresRepository:
         with self.connect() as db:
             # Keep this explicit rather than relying on deployment-specific
             # foreign-key cascades. It mirrors the SQLite repository exactly.
+            db.execute("DELETE FROM web_analytics_events WHERE user_id=?", (user_id,))
             db.execute("DELETE FROM feedback_items WHERE user_id=?", (user_id,))
             db.execute("DELETE FROM billing_orders WHERE user_id=?", (user_id,))
             db.execute("DELETE FROM notes WHERE owner_id=?", (user_id,))
@@ -342,6 +344,34 @@ class PostgresRepository:
             month_total = db.execute(f"SELECT COALESCE(SUM(amount),0) AS revenue, COUNT(*) AS orders FROM billing_orders WHERE {paid} AND substr(paid_at,1,7)=?", (selected,)).fetchone()
             recent = [dict(row) for row in db.execute("SELECT billing_orders.*, users.email FROM billing_orders JOIN users ON users.id=billing_orders.user_id WHERE COALESCE(provider_reference,'') <> 'DEMO_GRANT' ORDER BY created_at DESC LIMIT 10").fetchall()]
             return {"revenue": total["revenue"], "paid_orders": total["orders"], "customers": total["customers"], "pending_orders": pending["count"], "trend": trend, "months": months, "selected_month": selected, "month_trend": month_trend, "month_revenue": month_total["revenue"], "month_orders": month_total["orders"], "recent_orders": recent}
+
+    def record_web_event(self, event):
+        with self.connect() as db:
+            db.execute("INSERT INTO web_analytics_events (id,user_id,project_id,event_name,occurred_at) VALUES (?,?,?,?,?)", (event["id"], event["user_id"], event["project_id"], event["event_name"], event["occurred_at"]))
+
+    def analytics_overview(self, days):
+        cutoff = (datetime.now(timezone.utc) - timedelta(days=days)).isoformat()
+        monthly_cutoff = (datetime.now(timezone.utc) - timedelta(days=30)).isoformat()
+        paid = "status='PAID' AND COALESCE(provider_reference,'') <> 'DEMO_GRANT'"
+        with self.connect() as db:
+            total_users = db.execute("SELECT COUNT(*) AS count FROM users").fetchone()["count"]
+            new_users = db.execute("SELECT COUNT(*) AS count FROM users WHERE created_at IS NOT NULL AND created_at>=?", (cutoff,)).fetchone()["count"]
+            active_users = db.execute("SELECT COUNT(DISTINCT user_id) AS count FROM web_analytics_events WHERE occurred_at>=?", (cutoff,)).fetchone()["count"]
+            mau = db.execute("SELECT COUNT(DISTINCT user_id) AS count FROM web_analytics_events WHERE occurred_at>=?", (monthly_cutoff,)).fetchone()["count"]
+            paid_users = db.execute(f"SELECT COUNT(DISTINCT user_id) AS count FROM billing_orders WHERE {paid}").fetchone()["count"]
+            paid_projects = db.execute(f"SELECT COUNT(DISTINCT project_id) AS count FROM billing_orders WHERE {paid}").fetchone()["count"]
+            payment = db.execute(f"SELECT COUNT(*) AS orders, COALESCE(SUM(amount),0) AS revenue FROM billing_orders WHERE {paid} AND paid_at>=?", (cutoff,)).fetchone()
+            registrations = [dict(row) for row in db.execute("SELECT substr(created_at,1,10) AS day, COUNT(*) AS users FROM users WHERE created_at IS NOT NULL AND created_at>=? GROUP BY day ORDER BY day", (cutoff,)).fetchall()]
+            activity = [dict(row) for row in db.execute("SELECT substr(occurred_at,1,10) AS day, COUNT(DISTINCT user_id) AS users, COUNT(*) AS events FROM web_analytics_events WHERE occurred_at>=? GROUP BY day ORDER BY day", (cutoff,)).fetchall()]
+            features = [dict(row) for row in db.execute("SELECT event_name, COUNT(*) AS count, COUNT(DISTINCT user_id) AS users FROM web_analytics_events WHERE occurred_at>=? GROUP BY event_name ORDER BY count DESC, event_name LIMIT 8", (cutoff,)).fetchall()]
+            recent = [dict(row) for row in db.execute(f"SELECT billing_orders.*, users.email FROM billing_orders JOIN users ON users.id=billing_orders.user_id WHERE {paid} ORDER BY paid_at DESC LIMIT 10").fetchall()]
+        return {"days": days, "total_users": total_users, "new_users": new_users, "active_users": active_users, "mau": mau, "paid_users": paid_users, "paid_projects": paid_projects, "conversion_rate": round((paid_users * 100 / total_users), 1) if total_users else 0, "revenue": payment["revenue"], "successful_transactions": payment["orders"], "registrations": registrations, "activity": activity, "features": features, "recent_orders": recent}
+
+    def paid_users_export(self):
+        paid = "o.status='PAID' AND COALESCE(o.provider_reference,'') <> 'DEMO_GRANT'"
+        with self.connect() as db:
+            rows = db.execute(f"SELECT u.id,u.email,MIN(o.paid_at) AS first_paid_at,COUNT(*) AS paid_orders,SUM(o.amount) AS revenue_vnd FROM billing_orders o JOIN users u ON u.id=o.user_id WHERE {paid} GROUP BY u.id,u.email ORDER BY first_paid_at").fetchall()
+            return [(row["id"], row["email"], row["first_paid_at"], row["paid_orders"], row["revenue_vnd"]) for row in rows]
 
     @staticmethod
     def _feedback(row):

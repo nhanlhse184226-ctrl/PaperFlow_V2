@@ -9,6 +9,7 @@ import {
   Sparkles,
 } from "lucide-react";
 import { api } from "../../api";
+import { trackOnce } from "../../analytics";
 import { Badge, Empty } from "../../ui";
 import { useLanguage } from "../../i18n";
 import type { Evidence, WorkspaceProps } from "../../types";
@@ -21,6 +22,7 @@ type MatrixTranslation = {
 const PAGE_SIZE = 25;
 
 export default function Matrix({ p, run, busy, base, inspect }: WorkspaceProps) {
+  useEffect(() => { trackOnce(`matrix:${p.id}`, "evidence_matrix_open", p.id); }, [p.id]);
   const [comparisonSources, setComparisonSources] = useState<string[]>([]);
   const [comparisonOpen, setComparisonOpen] = useState(false);
   const [sourceId, setSourceId] = useState("all");

@@ -4,6 +4,9 @@ from threading import Lock
 from typing import Literal
 
 from fastapi import APIRouter, Depends, File, Query, Request, Response, UploadFile
+from fastapi.responses import StreamingResponse
+from io import StringIO
+import csv
 from pydantic import Field
 
 from app.application.models import AppError, Context, Model
@@ -68,13 +71,19 @@ class ProductFeedbackInput(Model):
     metadata: dict[str, str] = Field(default_factory=dict, max_length=3)
 
 
+class AnalyticsEventInput(Model):
+    name: Literal["page_view", "login", "sign_up", "project_create", "source_upload", "topic_check_complete", "evidence_matrix_open", "essay_check_complete", "begin_checkout"]
+    project_id: str | None = Field(default=None, min_length=1, max_length=100)
+
+
 class FeedbackStatusInput(Model):
     status: Literal["NEW", "REVIEWED", "RESOLVED"]
 
 
-def create_router(service, auth, settings, billing=None, feedback=None):
+def create_router(service, auth, settings, billing=None, feedback=None, analytics=None):
     router = APIRouter(prefix="/api")
     attempts = defaultdict(deque)
+    analytics_attempts = defaultdict(deque)
     guard = Lock()
 
     def user(request: Request):
@@ -108,6 +117,17 @@ def create_router(service, auth, settings, billing=None, feedback=None):
             if len(attempts[address]) >= 20:
                 raise AppError("Too many sign-in attempts. Wait five minutes.", 429)
             attempts[address].append(time.monotonic())
+
+
+    def allow_analytics_event(user_id):
+        with guard:
+            cutoff = time.monotonic() - 60
+            queue = analytics_attempts[user_id]
+            while queue and queue[0] < cutoff:
+                queue.popleft()
+            if len(queue) >= 120:
+                raise AppError("Too many analytics events. Please slow down.", 429)
+            queue.append(time.monotonic())
 
     def establish_session(token, current, response):
         response.set_cookie(
@@ -199,9 +219,28 @@ def create_router(service, auth, settings, billing=None, feedback=None):
     async def payos_webhook(request: Request):
         return billing.webhook(await request.body())
 
+    @router.post("/analytics/events", status_code=201)
+    def track_web_event(body: AnalyticsEventInput, current=Depends(user)):
+        allow_analytics_event(current["id"])
+        return analytics.track(current["id"], body.name, body.project_id)
+
     @router.get("/admin/overview")
-    def admin_overview(month: str | None = Query(default=None, max_length=7), current=Depends(admin)):
-        return billing.overview(month)
+    def admin_overview(
+        days: int = Query(default=30),
+        month: str | None = Query(default=None, max_length=7),
+        current=Depends(admin),
+    ):
+        # Preserve the established mobile response shape. Web-only analytics is
+        # additive and namespaced so Flutter clients need no release or parsing change.
+        return {**billing.overview(month), "analytics": analytics.overview(days)}
+
+    @router.get("/admin/paid-users.csv")
+    def admin_paid_users_csv(current=Depends(admin)):
+        output = StringIO()
+        writer = csv.writer(output)
+        writer.writerow(["user_id", "email", "first_paid_at", "paid_orders", "revenue_vnd"])
+        writer.writerows(analytics.paid_users_csv())
+        return StreamingResponse(iter(["\ufeff" + output.getvalue()]), media_type="text/csv; charset=utf-8", headers={"Content-Disposition": "attachment; filename=paperflow-paid-users.csv"})
 
     @router.post("/feedback/ai", status_code=201)
     def ai_feedback(body: AiFeedbackInput, current=Depends(user)):

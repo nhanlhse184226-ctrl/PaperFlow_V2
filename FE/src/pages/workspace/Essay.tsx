@@ -10,6 +10,7 @@ import {
   Upload,
 } from "lucide-react";
 import { api, apiUrl } from "../../api";
+import { trackWebEvent } from "../../analytics";
 import { useLanguage } from "../../i18n";
 import { Badge, Empty, Notice, Modal } from "../../ui";
 import type { Claim, Draft, WorkspaceProps } from "../../types";
@@ -245,11 +246,12 @@ export default function Essay({ p, run, busy, base, inspect }: WorkspaceProps) {
                 className="primary"
                 disabled={busy || !p.confirmed}
                 onClick={() =>
-                  void run("Extracting and checking claims", () =>
-                    api(base + "/drafts/" + draft.id + "/check", "POST", {
+                  void run("Extracting and checking claims", async () => {
+                    await api(base + "/drafts/" + draft.id + "/check", "POST", {
                       force: draft.status === "checked",
-                    }),
-                  )
+                    });
+                    void trackWebEvent("essay_check_complete", p.id);
+                  })
                 }
               >
                 <Sparkles size={16} />

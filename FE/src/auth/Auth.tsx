@@ -4,6 +4,7 @@ import { api } from "../api";
 import { Notice, Brand, message } from "../ui";
 import type { FormEvent } from "react";
 import type { User } from "../types";
+import { trackWebEvent } from "../analytics";
 
 type GoogleCredentialResponse = { credential: string };
 type GoogleConfig = { enabled: boolean; client_id: string };
@@ -102,12 +103,12 @@ export default function Auth({ onLogin }: { onLogin: (user: User) => void }) {
     setBusy(true);
     setError("");
     try {
-      onLogin(
-        await api<User>("/auth/" + (register ? "register" : "login"), "POST", {
-          email: data.get("email"),
-          password: data.get("password"),
-        }),
-      );
+      const user = await api<User>("/auth/" + (register ? "register" : "login"), "POST", {
+        email: data.get("email"),
+        password: data.get("password"),
+      });
+      void trackWebEvent(register ? "sign_up" : "login");
+      onLogin(user);
     } catch (e) {
       setError(message(e));
     } finally {
@@ -119,7 +120,9 @@ export default function Auth({ onLogin }: { onLogin: (user: User) => void }) {
     setBusy(true);
     setError("");
     try {
-      onLogin(await api<User>("/auth/google", "POST", { credential }));
+      const user = await api<User>("/auth/google", "POST", { credential });
+      void trackWebEvent("login");
+      onLogin(user);
     } catch (e) {
       setError(message(e));
     } finally {

@@ -2799,3 +2799,19 @@ blockquote {
 .chart-column { outline-offset: 3px; }
 .chart-column:focus-visible { outline: 2px solid #245d49; border-radius: 5px; }
 @media (max-width: 800px) { .admin-report-grid { grid-template-columns: 1fr; }.admin-month-filter { width: 100%; }.admin-month-filter select { width: 100%; }.analytics-card .section-heading { align-items: flex-start; flex-wrap: wrap; } }
+/* Web analytics dashboard: clear source labels, responsive KPI grid, no color-only meaning. */
+.analytics-period { display: flex; align-items: center; gap: 8px; margin: 22px 0 0; flex-wrap: wrap; }
+.analytics-period span { margin-right: 4px; color: var(--muted); font-size: 13px; font-weight: 700; }
+.analytics-period button { min-height: 40px; padding: 8px 14px; border: 1px solid var(--line); border-radius: 9px; background: #fff; color: var(--ink); font: inherit; }
+.analytics-period button.active { background: var(--green); border-color: var(--green); color: #fff; }
+.analytics-kpis { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+.analytics-kpis article { min-height: 144px; }
+.analytics-kpis em { display: block; margin-top: 5px; color: var(--muted); font-size: 11px; font-style: normal; line-height: 1.35; }
+.analytics-note { margin: 0 0 20px; padding: 13px 16px; border: 1px solid #d6e6d8; border-radius: 11px; background: #f3f8f2; color: #365741; font-size: 13px; line-height: 1.5; }
+.analytics-bars { min-height: 210px; }
+.feature-list { display: grid; gap: 0; margin-top: 15px; border: 1px solid var(--line); border-radius: 10px; overflow: hidden; }
+.feature-list > div { display: flex; justify-content: space-between; gap: 16px; padding: 12px 14px; border-bottom: 1px solid var(--line); font-size: 13px; }
+.feature-list > div:last-child { border-bottom: 0; }
+.feature-list span { color: var(--muted); font-variant-numeric: tabular-nums; white-space: nowrap; }
+@media (max-width: 1100px) { .analytics-kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 560px) { .analytics-kpis { grid-template-columns: 1fr; } .analytics-kpis article { min-height: auto; } .feature-list > div { align-items: flex-start; flex-direction: column; gap: 4px; } }

@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { ArrowRight, Check, Compass, FileText, Sparkles, Upload, X } from "lucide-react";
 import { api } from "../../api";
+import { trackWebEvent } from "../../analytics";
 import { Badge, Empty, TextList, Notice, message } from "../../ui";
 import { useLanguage } from "../../i18n";
 import AiFeedback from "../../components/AiFeedback";
@@ -63,6 +64,7 @@ export default function Topic({ p, run, busy, base }: WorkspaceProps) {
         form.append("file", item);
         await api(base + "/sources", "POST", form);
       }
+      void trackWebEvent("source_upload", p.id);
     });
   }
   return (
@@ -125,6 +127,7 @@ export default function Topic({ p, run, busy, base }: WorkspaceProps) {
                     await api(base + "/topic/analyze", "POST", {
                       force: !!p.analysis,
                     });
+                    void trackWebEvent("topic_check_complete", p.id);
                   })
                 }
               >

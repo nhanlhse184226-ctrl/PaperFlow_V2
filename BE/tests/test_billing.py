@@ -1,6 +1,6 @@
 from fastapi.testclient import TestClient
 
-from app.application.models import uid
+from app.application.models import now, uid
 from app.application.services import AuthService
 from app.main import Settings, create_app
 from app.seed_demo import ensure_account, grant_pro
@@ -99,36 +99,54 @@ def test_billing_owner_and_legacy_project_are_preserved(tmp_path):
         assert client.post(f"/api/billing/orders/{code}/refresh").status_code == 404
 
 
-def test_admin_monthly_report_filters_revenue_and_excludes_demo_grants(tmp_path):
+def test_admin_analytics_reports_real_payments_and_web_events(tmp_path):
     app = create_app(Settings(data_dir=tmp_path, allowed_origins="http://testserver", allowed_hosts="testserver",
                               initial_admin_email="admin@example.edu"), ai=FakeAi(), payment_gateway=FakePayOS())
     with TestClient(app) as client:
         register(client, "admin@example.edu")
         current = client.get("/api/auth/me").json()
         project_id = client.post("/api/projects", json={"name": "Reporting project"}).json()["id"]
-
-        def paid(code, month, amount, reference="bank"):
-            stamp = f"{month}-15T12:00:00+00:00"
-            app.state.repo.create_billing_order({
-                "id": uid(), "order_code": code, "user_id": current["id"], "project_id": project_id,
-                "project_name": "Reporting project", "plan_id": "pro", "plan_name": "Pro", "amount": amount,
-                "status": "PAID", "payment_link_id": "test", "checkout_url": None,
-                "created_at": stamp, "paid_at": stamp, "provider_reference": reference,
-            })
-
-        paid(700_000_000_001, "2026-01", 39_000)
-        paid(700_000_000_002, "2026-02", 99_000)
-        paid(700_000_000_003, "2026-02", 99_000, "DEMO_GRANT")
-        response = client.get("/api/admin/overview?month=2026-02")
-        assert response.status_code == 200
-        report = response.json()
-        assert report["revenue"] == 138_000
-        assert report["paid_orders"] == 2
-        assert report["selected_month"] == "2026-02"
-        assert report["month_revenue"] == 99_000
-        assert report["month_orders"] == 1
-        assert [item["month"] for item in report["months"]] == ["2026-01", "2026-02"]
-        assert client.get("/api/admin/overview?month=2026-13").status_code == 422
+        stamp = now()
+        app.state.repo.create_billing_order({
+            "id": uid(), "order_code": 700_000_000_001, "user_id": current["id"], "project_id": project_id,
+            "project_name": "Reporting project", "plan_id": "pro", "plan_name": "Pro", "amount": 99_000,
+            "status": "PAID", "payment_link_id": "test", "checkout_url": None,
+            "created_at": stamp, "paid_at": stamp, "provider_reference": "bank",
+        })
+        app.state.repo.create_billing_order({
+            "id": uid(), "order_code": 700_000_000_002, "user_id": current["id"], "project_id": project_id,
+            "project_name": "Reporting project", "plan_id": "pro", "plan_name": "Pro", "amount": 99_000,
+            "status": "PAID", "payment_link_id": "demo", "checkout_url": None,
+            "created_at": stamp, "paid_at": stamp, "provider_reference": "DEMO_GRANT",
+        })
+        assert client.post("/api/analytics/events", json={"name": "page_view"}).status_code == 201
+        assert client.post("/api/analytics/events", json={"name": "source_upload", "project_id": project_id}).status_code == 201
+        report = client.get("/api/admin/overview?days=30").json()
+        # The established Flutter contract remains at the top level.
+        assert report["revenue"] == 99_000
+        assert report["paid_orders"] == 1
+        assert report["customers"] == 1
+        assert report["pending_orders"] == 0
+        assert {"trend", "months", "selected_month", "month_trend", "month_revenue", "month_orders", "recent_orders"} <= set(report)
+        # Web-only analytics is additive and cannot collide with existing keys.
+        assert report["analytics"]["revenue"] == 99_000
+        assert report["analytics"]["successful_transactions"] == 1
+        assert report["analytics"]["paid_users"] == 1
+        assert report["analytics"]["active_users"] == 1
+        assert report["analytics"]["mau"] == 1
+        assert report["analytics"]["total_users"] == 1
+        assert report["analytics"]["new_users"] == 1
+        assert {item["event_name"] for item in report["analytics"]["features"]} == {"page_view", "source_upload"}
+        assert client.get("/api/admin/overview?days=14").status_code == 422
+        assert client.post("/api/analytics/events", json={"name": "source_upload", "project_id": "not-owned"}).status_code == 404
+        client.post("/api/auth/logout")
+        register(client, "member@example.edu")
+        assert client.get("/api/admin/overview?days=30").status_code == 403
+        client.post("/api/auth/logout")
+        assert client.post("/api/auth/login", json={"email": "admin@example.edu", "password": "correct horse battery"}).status_code == 200
+        csv = client.get("/api/admin/paid-users.csv")
+        assert csv.status_code == 200
+        assert "admin@example.edu" in csv.text
 
 
 def test_demo_seed_grants_pro_without_counting_as_revenue(tmp_path):

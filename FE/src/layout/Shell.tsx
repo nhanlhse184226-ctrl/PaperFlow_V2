@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { NavLink, Navigate, Route, Routes } from "react-router-dom";
+import { NavLink, Navigate, Route, Routes, useLocation } from "react-router-dom";
 import {
   ArrowRight,
   Compass,
@@ -22,6 +22,7 @@ import Admin from "../pages/Admin";
 import Feedback from "../pages/Feedback";
 import AdminFeedback from "../pages/AdminFeedback";
 import { LanguageToggle, useLanguage } from "../i18n";
+import { trackOnce } from "../analytics";
 export default function Shell({
   user,
   logout,
@@ -32,7 +33,11 @@ export default function Shell({
   const [menu, setMenu] = useState(false),
     [error, setError] = useState("");
   const language = useLanguage();
+  const location = useLocation();
   const menuButton = useRef<HTMLButtonElement>(null);
+  useEffect(() => {
+    trackOnce(`view:${location.pathname}`, "page_view");
+  }, [location.pathname]);
   useEffect(() => {
     if (!menu) return;
     const close = (event: KeyboardEvent) => {
