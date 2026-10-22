@@ -2804,6 +2804,16 @@ blockquote {
 .analytics-period span { margin-right: 4px; color: var(--muted); font-size: 13px; font-weight: 700; }
 .analytics-period button { min-height: 40px; padding: 8px 14px; border: 1px solid var(--line); border-radius: 9px; background: #fff; color: var(--ink); font: inherit; }
 .analytics-period button.active { background: var(--green); border-color: var(--green); color: #fff; }
+.analytics-month { display: inline-flex; align-items: center; gap: 8px; margin-left: 4px; color: var(--muted); font-size: 12px; font-weight: 700; }
+.analytics-month span { margin: 0; }
+.analytics-month input { min-height: 40px; padding: 6px 10px; border: 1px solid var(--line); border-radius: 9px; background: #fff; color: var(--ink); font: inherit; }
+.analytics-scope { margin: 11px 0 18px; color: var(--muted); font-size: 13px; line-height: 1.5; }
+.analytics-scope strong { color: var(--deep); }
+.analytics-health { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; margin: 0 0 20px; }
+.analytics-health > div { display: grid; grid-template-columns: auto auto 1fr; align-items: baseline; gap: 8px; padding: 13px 16px; border: 1px solid #dce9de; border-radius: 11px; background: #f7faf5; }
+.analytics-health strong { color: #456153; font-size: 12px; letter-spacing: .04em; }
+.analytics-health span { color: var(--deep); font-family: Manrope, sans-serif; font-size: 22px; font-weight: 800; font-variant-numeric: tabular-nums; }
+.analytics-health small { color: var(--muted); font-size: 12px; }
 .analytics-kpis { grid-template-columns: repeat(4, minmax(0, 1fr)); }
 .analytics-kpis article { min-height: 144px; }
 .analytics-kpis em { display: block; margin-top: 5px; color: var(--muted); font-size: 11px; font-style: normal; line-height: 1.35; }
@@ -2814,4 +2824,4 @@ blockquote {
 .feature-list > div:last-child { border-bottom: 0; }
 .feature-list span { color: var(--muted); font-variant-numeric: tabular-nums; white-space: nowrap; }
 @media (max-width: 1100px) { .analytics-kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
-@media (max-width: 560px) { .analytics-kpis { grid-template-columns: 1fr; } .analytics-kpis article { min-height: auto; } .feature-list > div { align-items: flex-start; flex-direction: column; gap: 4px; } }
+@media (max-width: 560px) { .analytics-kpis, .analytics-health { grid-template-columns: 1fr; } .analytics-kpis article { min-height: auto; } .analytics-health > div { grid-template-columns: auto 1fr; } .analytics-health small { grid-column: 1 / -1; } .analytics-month { width: 100%; margin-left: 0; } .analytics-month input { flex: 1; } .feature-list > div { align-items: flex-start; flex-direction: column; gap: 4px; } }

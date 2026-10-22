@@ -31,10 +31,10 @@ class AnalyticsService:
         })
         return {"ok": True}
 
-    def overview(self, days: int):
+    def overview(self, days: int, month: str | None = None):
         if days not in (7, 30, 90):
             raise AppError("Khoảng thời gian phải là 7, 30 hoặc 90 ngày.", 422)
-        return self.repo.analytics_overview(days)
+        return self.repo.analytics_overview(days, month)
 
     def paid_users_csv(self):
         return self.repo.paid_users_export()

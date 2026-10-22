@@ -136,7 +136,14 @@ def test_admin_analytics_reports_real_payments_and_web_events(tmp_path):
         assert report["analytics"]["mau"] == 1
         assert report["analytics"]["total_users"] == 1
         assert report["analytics"]["new_users"] == 1
+        assert report["analytics"]["period"]["kind"] == "days"
+        assert report["analytics"]["conversion_rate"] is None
         assert {item["event_name"] for item in report["analytics"]["features"]} == {"page_view", "source_upload"}
+        month_report = client.get(f"/api/admin/overview?days=30&month={stamp[:7]}")
+        assert month_report.status_code == 200
+        assert month_report.json()["analytics"]["period"]["kind"] == "month"
+        assert month_report.json()["analytics"]["revenue"] == 99_000
+        assert client.get("/api/admin/overview?days=30&month=2026-13").status_code == 422
         assert client.get("/api/admin/overview?days=14").status_code == 422
         assert client.post("/api/analytics/events", json={"name": "source_upload", "project_id": "not-owned"}).status_code == 404
         client.post("/api/auth/logout")

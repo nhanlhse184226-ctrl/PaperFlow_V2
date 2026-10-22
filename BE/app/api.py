@@ -232,7 +232,7 @@ def create_router(service, auth, settings, billing=None, feedback=None, analytic
     ):
         # Preserve the established mobile response shape. Web-only analytics is
         # additive and namespaced so Flutter clients need no release or parsing change.
-        return {**billing.overview(month), "analytics": analytics.overview(days)}
+        return {**billing.overview(month), "analytics": analytics.overview(days, month)}
 
     @router.get("/admin/paid-users.csv")
     def admin_paid_users_csv(current=Depends(admin)):

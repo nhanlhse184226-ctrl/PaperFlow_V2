@@ -349,23 +349,58 @@ class PostgresRepository:
         with self.connect() as db:
             db.execute("INSERT INTO web_analytics_events (id,user_id,project_id,event_name,occurred_at) VALUES (?,?,?,?,?)", (event["id"], event["user_id"], event["project_id"], event["event_name"], event["occurred_at"]))
 
-    def analytics_overview(self, days):
-        cutoff = (datetime.now(timezone.utc) - timedelta(days=days)).isoformat()
-        monthly_cutoff = (datetime.now(timezone.utc) - timedelta(days=30)).isoformat()
+    def analytics_overview(self, days, month=None):
+        current = datetime.now(timezone.utc)
+        if month:
+            try:
+                start = datetime.strptime(month, "%Y-%m").replace(tzinfo=timezone.utc)
+            except ValueError as exc:
+                raise AppError("Tháng báo cáo phải có định dạng YYYY-MM.", 422) from exc
+            if start.strftime("%Y-%m") != month:
+                raise AppError("Tháng báo cáo phải có định dạng YYYY-MM.", 422)
+            if start.month == 12:
+                end = start.replace(year=start.year + 1, month=1)
+            else:
+                end = start.replace(month=start.month + 1)
+            period = {
+                "kind": "month", "label": f"Tháng {month}",
+                "start": start.date().isoformat(), "end": (end - timedelta(days=1)).date().isoformat(),
+            }
+        else:
+            start = current - timedelta(days=days)
+            end = current
+            period = {
+                "kind": "days", "label": f"{days} ngày gần nhất",
+                "start": start.date().isoformat(), "end": current.date().isoformat(),
+            }
+        start_at, end_at = start.isoformat(), end.isoformat()
+        day_start = (current - timedelta(days=1)).isoformat()
+        month_start = (current - timedelta(days=30)).isoformat()
         paid = "status='PAID' AND COALESCE(provider_reference,'') <> 'DEMO_GRANT'"
         with self.connect() as db:
             total_users = db.execute("SELECT COUNT(*) AS count FROM users").fetchone()["count"]
-            new_users = db.execute("SELECT COUNT(*) AS count FROM users WHERE created_at IS NOT NULL AND created_at>=?", (cutoff,)).fetchone()["count"]
-            active_users = db.execute("SELECT COUNT(DISTINCT user_id) AS count FROM web_analytics_events WHERE occurred_at>=?", (cutoff,)).fetchone()["count"]
-            mau = db.execute("SELECT COUNT(DISTINCT user_id) AS count FROM web_analytics_events WHERE occurred_at>=?", (monthly_cutoff,)).fetchone()["count"]
-            paid_users = db.execute(f"SELECT COUNT(DISTINCT user_id) AS count FROM billing_orders WHERE {paid}").fetchone()["count"]
-            paid_projects = db.execute(f"SELECT COUNT(DISTINCT project_id) AS count FROM billing_orders WHERE {paid}").fetchone()["count"]
-            payment = db.execute(f"SELECT COUNT(*) AS orders, COALESCE(SUM(amount),0) AS revenue FROM billing_orders WHERE {paid} AND paid_at>=?", (cutoff,)).fetchone()
-            registrations = [dict(row) for row in db.execute("SELECT substr(created_at,1,10) AS day, COUNT(*) AS users FROM users WHERE created_at IS NOT NULL AND created_at>=? GROUP BY day ORDER BY day", (cutoff,)).fetchall()]
-            activity = [dict(row) for row in db.execute("SELECT substr(occurred_at,1,10) AS day, COUNT(DISTINCT user_id) AS users, COUNT(*) AS events FROM web_analytics_events WHERE occurred_at>=? GROUP BY day ORDER BY day", (cutoff,)).fetchall()]
-            features = [dict(row) for row in db.execute("SELECT event_name, COUNT(*) AS count, COUNT(DISTINCT user_id) AS users FROM web_analytics_events WHERE occurred_at>=? GROUP BY event_name ORDER BY count DESC, event_name LIMIT 8", (cutoff,)).fetchall()]
-            recent = [dict(row) for row in db.execute(f"SELECT billing_orders.*, users.email FROM billing_orders JOIN users ON users.id=billing_orders.user_id WHERE {paid} ORDER BY paid_at DESC LIMIT 10").fetchall()]
-        return {"days": days, "total_users": total_users, "new_users": new_users, "active_users": active_users, "mau": mau, "paid_users": paid_users, "paid_projects": paid_projects, "conversion_rate": round((paid_users * 100 / total_users), 1) if total_users else 0, "revenue": payment["revenue"], "successful_transactions": payment["orders"], "registrations": registrations, "activity": activity, "features": features, "recent_orders": recent}
+            new_users = db.execute("SELECT COUNT(*) AS count FROM users WHERE created_at IS NOT NULL AND created_at>=? AND created_at<?", (start_at, end_at)).fetchone()["count"]
+            active_users = db.execute("SELECT COUNT(DISTINCT user_id) AS count FROM web_analytics_events WHERE occurred_at>=? AND occurred_at<?", (start_at, end_at)).fetchone()["count"]
+            dau = db.execute("SELECT COUNT(DISTINCT user_id) AS count FROM web_analytics_events WHERE occurred_at>=?", (day_start,)).fetchone()["count"]
+            mau = db.execute("SELECT COUNT(DISTINCT user_id) AS count FROM web_analytics_events WHERE occurred_at>=?", (month_start,)).fetchone()["count"]
+            paid_users = db.execute(f"SELECT COUNT(DISTINCT user_id) AS count FROM billing_orders WHERE {paid} AND paid_at>=? AND paid_at<?", (start_at, end_at)).fetchone()["count"]
+            paid_projects = db.execute(f"SELECT COUNT(DISTINCT project_id) AS count FROM billing_orders WHERE {paid} AND paid_at>=? AND paid_at<?", (start_at, end_at)).fetchone()["count"]
+            payment = db.execute(f"SELECT COUNT(*) AS orders, COALESCE(SUM(amount),0) AS revenue FROM billing_orders WHERE {paid} AND paid_at>=? AND paid_at<?", (start_at, end_at)).fetchone()
+            checkout_starts = db.execute("SELECT COUNT(*) AS count FROM web_analytics_events WHERE event_name='begin_checkout' AND occurred_at>=? AND occurred_at<?", (start_at, end_at)).fetchone()["count"]
+            registrations = [dict(row) for row in db.execute("SELECT substr(created_at,1,10) AS day, COUNT(*) AS users FROM users WHERE created_at IS NOT NULL AND created_at>=? AND created_at<? GROUP BY day ORDER BY day", (start_at, end_at)).fetchall()]
+            activity = [dict(row) for row in db.execute("SELECT substr(occurred_at,1,10) AS day, COUNT(DISTINCT user_id) AS users, COUNT(*) AS events FROM web_analytics_events WHERE occurred_at>=? AND occurred_at<? GROUP BY day ORDER BY day", (start_at, end_at)).fetchall()]
+            features = [dict(row) for row in db.execute("SELECT event_name, COUNT(*) AS count, COUNT(DISTINCT user_id) AS users FROM web_analytics_events WHERE occurred_at>=? AND occurred_at<? GROUP BY event_name ORDER BY count DESC, event_name LIMIT 8", (start_at, end_at)).fetchall()]
+            recent = [dict(row) for row in db.execute(f"SELECT billing_orders.*, users.email FROM billing_orders JOIN users ON users.id=billing_orders.user_id WHERE {paid} AND paid_at>=? AND paid_at<? ORDER BY paid_at DESC LIMIT 10", (start_at, end_at)).fetchall()]
+        return {
+            "days": days, "period": period, "total_users": total_users,
+            "new_users": new_users, "active_users": active_users, "dau": dau, "mau": mau,
+            "paid_users": paid_users, "paid_projects": paid_projects,
+            "checkout_starts": checkout_starts,
+            "conversion_rate": round((payment["orders"] * 100 / checkout_starts), 1) if checkout_starts else None,
+            "revenue": payment["revenue"], "successful_transactions": payment["orders"],
+            "registrations": registrations, "activity": activity, "features": features,
+            "recent_orders": recent,
+        }
 
     def paid_users_export(self):
         paid = "o.status='PAID' AND COALESCE(o.provider_reference,'') <> 'DEMO_GRANT'"
