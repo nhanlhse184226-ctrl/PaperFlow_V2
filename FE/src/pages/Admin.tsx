@@ -50,7 +50,7 @@ const eventLabels: Record<string, string> = {
   topic_check_complete: "Phân tích chủ đề AI",
   evidence_matrix_open: "Mở ma trận bằng chứng",
   essay_check_complete: "Kiểm tra bài viết AI",
-  begin_checkout: "Bắt đầu thanh toán",
+  begin_checkout: "Mở trang thanh toán",
   purchase: "Thanh toán thành công",
 };
 
@@ -98,7 +98,7 @@ export default function Admin({ logout }: { logout: () => Promise<void> }) {
     [UserPlus, "Người dùng mới", String(data.new_users), `${rangeLabel} · Web/Backend`],
     [Activity, "Người dùng hoạt động", String(data.active_users), `${rangeLabel} · Web`],
     [CreditCard, "Người dùng trả phí", String(data.paid_users), `${rangeLabel} · PayOS`],
-    [Percent, "Tỷ lệ chuyển đổi", conversion, data.checkout_starts ? `${rangeLabel} · thành công / bắt đầu thanh toán` : `${rangeLabel} · chưa có lượt bắt đầu thanh toán`],
+    [Percent, "Tỷ lệ chuyển đổi", conversion, data.checkout_starts ? `${rangeLabel} · thành công / đơn thanh toán đã tạo` : `${rangeLabel} · chưa có đơn thanh toán đã tạo`],
     [ReceiptText, "Doanh thu", money(data.revenue), `${rangeLabel} · PayOS`],
     [BarChart3, "Giao dịch thành công", String(data.successful_transactions), `${rangeLabel} · PayOS`],
   ] as const;

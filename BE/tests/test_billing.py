@@ -58,6 +58,8 @@ def test_project_purchase_enforces_caps_and_webhook_is_idempotent(tmp_path):
         assert checkout.status_code == 200
         code = checkout.json()["order_code"]
         assert checkout.json()["checkout_url"].startswith("https://pay.payos.vn/")
+        with app.state.repo.connect() as db:
+            assert db.execute("SELECT COUNT(*) AS count FROM web_analytics_events WHERE event_name='begin_checkout'").fetchone()["count"] == 1
         assert client.post("/api/billing/checkout", json={"project_id": pid, "plan_id": "starter"}).json()["order_code"] == code
         assert client.post("/api/billing/checkout", json={"project_id": pid, "plan_id": "research"}).status_code == 409
         assert len(gateway.description) <= 9
@@ -137,7 +139,8 @@ def test_admin_analytics_reports_real_payments_and_web_events(tmp_path):
         assert report["analytics"]["total_users"] == 1
         assert report["analytics"]["new_users"] == 1
         assert report["analytics"]["period"]["kind"] == "days"
-        assert report["analytics"]["conversion_rate"] is None
+        assert report["analytics"]["checkout_starts"] == 1
+        assert report["analytics"]["conversion_rate"] == 100.0
         assert {item["event_name"] for item in report["analytics"]["features"]} == {"page_view", "source_upload"}
         month_report = client.get(f"/api/admin/overview?days=30&month={stamp[:7]}")
         assert month_report.status_code == 200

@@ -8,7 +8,7 @@ import {
 } from "lucide-react";
 import { Link, useLocation } from "react-router-dom";
 import { api } from "../api";
-import { trackOnce, trackWebEvent } from "../analytics";
+import { trackOnce } from "../analytics";
 import { Notice, message } from "../ui";
 
 type Plan = {
@@ -122,7 +122,6 @@ export default function Billing() {
         "POST",
         { project_id: project.id, plan_id: plan.id },
       );
-      void trackWebEvent("begin_checkout", project.id, plan.amount);
       window.location.assign(result.checkout_url);
     } catch (cause) {
       setError(message(cause));

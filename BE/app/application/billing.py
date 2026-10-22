@@ -107,6 +107,13 @@ class BillingService:
             self.repo.update_billing_order(order_code, status="CANCELLED")
             raise AppError("Không tạo được liên kết thanh toán. Vui lòng thử lại.", 502) from None
         self.repo.update_billing_order(order_code, payment_link_id=payment["payment_link_id"], checkout_url=payment["checkout_url"])
+        # The backend has confirmed a real PayOS checkout link, so record this
+        # before the browser leaves PaperFlow. Client-side fetches may be aborted
+        # by the redirect and must not be the source of truth for this event.
+        self.repo.record_web_event({
+            "id": uid(), "user_id": user_id, "project_id": project_id,
+            "event_name": "begin_checkout", "occurred_at": now(),
+        })
         return {"order_code": order_code, "checkout_url": payment["checkout_url"], "qr_code": payment.get("qr_code", "")}
 
     def webhook(self, raw: bytes):
