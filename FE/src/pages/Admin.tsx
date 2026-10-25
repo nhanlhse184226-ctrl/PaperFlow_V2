@@ -57,7 +57,7 @@ const eventLabels: Record<string, string> = {
 function Bars({ points, metric, label }: { points: Point[]; metric: "users" | "events"; label: string }) {
   const max = Math.max(1, ...points.map((point) => point[metric] || 0));
   if (!points.length) return <p className="analytics-empty">Chưa có dữ liệu trong khoảng thời gian này.</p>;
-  return <div className="revenue-chart analytics-bars" aria-label={label}>{points.map((point) => {
+  return <div className="revenue-chart chart-bars analytics-bars" aria-label={label}>{points.map((point) => {
     const value = point[metric] || 0;
     return <div className="chart-column" key={point.day} tabIndex={0} aria-label={`${point.day}: ${value}`}>
       <span>{value}</span><i style={{ height: `${Math.max(5, (value / max) * 100)}%` }} /><small>{point.day.slice(5)}</small>
