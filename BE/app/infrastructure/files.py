@@ -43,7 +43,10 @@ class PypdfExtractor:
                 stream = page.get_contents()
                 if stream and len(stream.get_data()) > 15_000_000:
                     raise AppError("A PDF page is too complex to process safely.")
-                text = (page.extract_text() or "").strip()
+                # PostgreSQL text values reject NUL bytes.  Some otherwise-readable
+                # PDFs contain them in their text stream, so remove only that
+                # invalid control character before the text enters the workflow.
+                text = (page.extract_text() or "").replace("\x00", "").strip()
                 if len(text) > 80000:
                     raise AppError("A PDF page exceeds the text limit.")
                 pages.append(Page(number=number, text=text))

@@ -1,6 +1,8 @@
 import sqlite3
 import zipfile
 from io import BytesIO
+from types import SimpleNamespace
+from unittest.mock import patch
 
 import pytest
 from fastapi.testclient import TestClient
@@ -9,6 +11,17 @@ from app.application.models import AppError
 from app.infrastructure.files import PypdfExtractor
 from app.main import Settings, create_app
 from tests.fakes import CLAIM, QUOTE, FakeAi, pdf_bytes
+
+
+def test_pdf_extraction_removes_nul_bytes_before_persistence():
+    page = SimpleNamespace(
+        get_contents=lambda: None,
+        extract_text=lambda: "A\x00 readable page with enough valid characters for extraction.",
+    )
+    reader = SimpleNamespace(is_encrypted=False, pages=[page])
+    with patch("app.infrastructure.files.PdfReader", return_value=reader):
+        pages = PypdfExtractor().extract(b"%PDF-1.7\n")
+    assert pages[0].text == "A readable page with enough valid characters for extraction."
 
 
 @pytest.fixture
